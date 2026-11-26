@@ -14,8 +14,17 @@ from pathlib import Path
 from factory.config.schema import FactoryConfig
 from factory.ports.errors import Conflict
 from factory.ports.types import (
-    LinkKind, LogicalStatus, MergeRequest, MergeRequestDraft, MergeRequestState, Principal, PrincipalKind, Ticket,
-    TicketDraft, TicketKey, TicketUpdate,
+    LinkKind,
+    LogicalStatus,
+    MergeRequest,
+    MergeRequestDraft,
+    MergeRequestState,
+    Principal,
+    PrincipalKind,
+    Ticket,
+    TicketDraft,
+    TicketKey,
+    TicketUpdate,
 )
 from factory.redaction import Redactor
 

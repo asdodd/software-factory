@@ -13,8 +13,18 @@ from factory.config.secrets import SecretError
 from factory.ports.context import AdapterContext
 from factory.ports.errors import Conflict, NotFound, SubmoduleFailure
 from factory.ports.types import (
-    CheckoutResult, Cursor, HostCommentEvent, MergeRequest, MergeRequestDraft, MergeRequestState, MrComment, Page,
-    Principal, PrincipalKind, RepoRef, Suggestion,
+    CheckoutResult,
+    Cursor,
+    HostCommentEvent,
+    MergeRequest,
+    MergeRequestDraft,
+    MergeRequestState,
+    MrComment,
+    Page,
+    Principal,
+    PrincipalKind,
+    RepoRef,
+    Suggestion,
 )
 from factory.vcs.git import Git, GitError, HostAuth, options_from_config
 

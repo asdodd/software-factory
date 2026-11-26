@@ -22,7 +22,8 @@ for var in os.environ:
 
 url, token, model, dialect = (os.environ["GATEWAY_URL"], os.environ["GATEWAY_TOKEN"], os.environ["MODEL"],
                               os.environ.get("DIALECT", "openai_chat"))
-task = open(os.environ["INSTRUCTIONS"]).read()
+with open(os.environ["INSTRUCTIONS"]) as fh:
+    task = fh.read()
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 if dialect == "anthropic_messages":
     body = {"model": "whatever-the-cli-wants", "max_tokens": 1024, "stream": True, "system": task,

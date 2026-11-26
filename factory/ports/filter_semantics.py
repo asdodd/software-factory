@@ -39,7 +39,4 @@ def matches(f: TicketFilter, ticket: Ticket) -> bool:
         return False
     if f.statuses and ticket.status not in f.statuses:
         return False
-    for name, wanted in f.custom_fields.items():
-        if not (_norm([ticket.fields.get(name)]) & set(wanted)):
-            return False
-    return True
+    return all(_norm([ticket.fields.get(name)]) & set(wanted) for name, wanted in f.custom_fields.items())

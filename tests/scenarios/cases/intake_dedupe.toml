@@ -1,0 +1,15 @@
+name = "intake dedupes by fingerprint and is idempotent on event id"
+include = ["_common.toml"]
+
+[[steps]]
+intake = { source = "monitoring", event_id = "alert-1", project = "SIM", summary = "Calc add() returns wrong sign", repo = "web/portal", location = "src/calc.py:add", trusted = false, fields = { acceptance_criteria = "- sign fixed" } }
+[[steps]]
+intake = { source = "monitoring", event_id = "alert-1", project = "SIM", summary = "Calc add() returns wrong sign", repo = "web/portal", location = "src/calc.py:add", trusted = false }
+[[steps]]
+intake = { source = "gitlab", event_id = "note-77", project = "SIM", summary = "calc ADD() returns   wrong sign!", repo = "web/portal", location = "src/calc.py:add", trusted = false }
+
+[expect]
+ticket_count = 1
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["A matching report arrived from gitlab; no duplicate was created."]

@@ -54,7 +54,7 @@ def changes(copy_root: Path) -> list[Change]:
     out = git.run(["diff", "--cached", "--name-status", "--no-renames", "-z", "HEAD"], cwd=copy_root).stdout
     parts = [p for p in out.split("\0") if p]
     found = []
-    for status, path in zip(parts[::2], parts[1::2]):
+    for status, path in zip(parts[::2], parts[1::2], strict=True):
         found.append(Change(path, status[0], (copy_root / path).is_symlink()))
     return found
 

@@ -24,8 +24,24 @@ from factory.core.recorder import Recorder
 from factory.core.writes import Note, Writes
 from factory.ports.errors import BudgetExceeded, NotFound, SubmoduleFailure
 from factory.ports.types import (
-    Artifact, CallContext, Command, CommandResult, HarnessStatus, HarnessTask, LogicalStatus, MergeRequestDraft,
-    Message, ModelEndpoint, Notification, NotificationKind, Outcome, RepoRef, Role, Ticket, Workspace, WorkspaceSpec,
+    Artifact,
+    CallContext,
+    Command,
+    CommandResult,
+    HarnessStatus,
+    HarnessTask,
+    LogicalStatus,
+    MergeRequestDraft,
+    Message,
+    ModelEndpoint,
+    Notification,
+    NotificationKind,
+    Outcome,
+    RepoRef,
+    Role,
+    Ticket,
+    Workspace,
+    WorkspaceSpec,
 )
 from factory.vcs.git import Git, GitOptions
 
@@ -501,12 +517,12 @@ class _Run:
             mr_url = mr.url
             links["Merge request"] = mr.url
             self.w.state.put("mr", self.key, json.dumps({"repo": self.repo.path, "id": mr.id, "branch": branch}))
-            outcome, milestone = Outcome.MR_OPENED, "mr_opened"
+            outcome = Outcome.MR_OPENED
         else:
             compare = self.w.git.compare_url(self.repo, self.repo.default_branch, branch)
             if compare:
                 links["Compare"] = compare
-            outcome, milestone = Outcome.BRANCH_PUSHED, "branch_pushed"
+            outcome = Outcome.BRANCH_PUSHED
         self.w.writes.transition(self.key, LogicalStatus.IN_REVIEW)
         self.release()
         self.w.state.delete("attempts", self.key)

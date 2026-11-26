@@ -66,10 +66,10 @@ def check_changes(found: Sequence[Change], stats: LineStats, ticket: Ticket, cfg
         report.failures.append("the change touches a path restricted by the access policy")
     for c in found:
         source = copy_root / c.path
-        if c.status != "D" and source.is_file() and not source.is_symlink():
-            if guard.content_matches(source.read_bytes()):
-                report.failures.append("the change adds content carrying a restricted marking")
-                break
+        if (c.status != "D" and source.is_file() and not source.is_symlink()
+                and guard.content_matches(source.read_bytes())):
+            report.failures.append("the change adds content carrying a restricted marking")
+            break
     for sub in submodule_paths:
         touched = [p for p in paths if p == sub or p.startswith(sub.rstrip("/") + "/")]
         if not touched:

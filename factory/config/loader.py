@@ -207,13 +207,14 @@ def load(
     root: Path | str,
     profile: str | None = None,
     env: Mapping[str, str] | None = None,
-    overrides: Overrides = Overrides(),
+    overrides: Overrides | None = None,
     extra_layers: Sequence[Layer] = (),
     agents_dir: Path | str | None = None,
 ) -> LoadedConfig:
     from factory.config.checks import check
 
     root = Path(root)
+    overrides = overrides or Overrides()
     env = dict(os.environ if env is None else env)
     profile = profile or env.get("FACTORY_PROFILE") or DEFAULT_PROFILE
     problems: list[str] = []

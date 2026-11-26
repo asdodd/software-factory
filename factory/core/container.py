@@ -8,12 +8,12 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
-from factory.core.trace_writers import NullTraceWriter, write_only
 from factory.config.checks import required_ports
 from factory.config.loader import LoadedConfig
 from factory.config.registry import resolve_class
 from factory.config.schema import PluginSelection
 from factory.config.secrets import SecretResolver
+from factory.core.trace_writers import NullTraceWriter, write_only
 from factory.metrics import Metrics
 from factory.ports import PORTS, AgentHarness, ModelProvider, TraceStore
 from factory.ports.context import AdapterContext

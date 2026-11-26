@@ -129,11 +129,38 @@ def _sandbox_hides_paths(cfg: FactoryConfig) -> bool:
     return bool(getattr(cls, "HIDES_PATHS", False))
 
 
+OPTIONAL_EMPTY = frozenset({"ca_bundle_path", "session_token", "prefix", "kms_key_id", "region", "default_project",
+                            "default_issue_type", "spec_approved", "stalled", "template_path"})
+
+
+def _empty_values(data: object, path: str = "") -> list[str]:
+    found = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            here = f"{path}.{key}" if path else str(key)
+            if value == "" and key not in OPTIONAL_EMPTY:
+                found.append(here)
+            else:
+                found.extend(_empty_values(value, here))
+    return found
+
+
 def check(loaded: LoadedConfig) -> list[Diagnostic]:
     from factory.config.loader import Diagnostic
 
     cfg = loaded.config
     out: list[Diagnostic] = []
+    if loaded.profile != "sim":
+        needed = set(required_ports(loaded.features))
+        for name in loaded.enabled_agents():
+            needed |= set(required_ports(loaded.agent_features[name]))
+        for layer in loaded.layers:
+            if layer.source.startswith("file:profile:"):
+                for path in _empty_values(layer.data):
+                    parts = path.split(".")
+                    if parts[0] == "plugins" and parts[1] not in needed:
+                        continue
+                    out.append(Diagnostic("error", f"{path} is empty in profile {loaded.profile}: fill it in to go live"))
     _check_one("", cfg, loaded.features, out)
     for name, agent in loaded.agents.items():
         if not agent.enabled:

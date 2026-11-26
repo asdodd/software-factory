@@ -14,7 +14,17 @@ from factory.ports.context import AdapterContext
 from factory.ports.errors import Conflict, InvalidRequest, NotFound
 from factory.ports.filter_semantics import matches
 from factory.ports.types import (
-    Attachment, Comment, Cursor, LinkKind, Page, Principal, PrincipalKind, Ticket, TicketDraft, TicketFilter, TicketKey,
+    Attachment,
+    Comment,
+    Cursor,
+    LinkKind,
+    Page,
+    Principal,
+    PrincipalKind,
+    Ticket,
+    TicketDraft,
+    TicketFilter,
+    TicketKey,
     TicketUpdate,
 )
 

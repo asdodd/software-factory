@@ -5,7 +5,14 @@ from __future__ import annotations
 
 from factory.ports.errors import BudgetExceeded
 from factory.ports.types import (
-    CallContext, Message, ModelRequest, ModelResponse, SpendRecord, SpendScope, SpendScopeKind, ToolSpec,
+    CallContext,
+    Message,
+    ModelRequest,
+    ModelResponse,
+    SpendRecord,
+    SpendScope,
+    SpendScopeKind,
+    ToolSpec,
 )
 
 
