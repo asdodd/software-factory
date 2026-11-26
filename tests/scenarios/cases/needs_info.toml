@@ -1,0 +1,19 @@
+name = "the agent posts numbered questions and pauses"
+include = ["_common.toml", "_ticket.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [{ result = { status = "needs_info", summary = "The rounding rule is unclear.", questions = ["Should multiply round to 2 decimals?", "Which module owns rounding?"] } }]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-needs-info"]
+lease_released = true
+comments_contain = ["Needs more information", "1. Should multiply round to 2 decimals?", "2. Which module owns rounding?"]
+[expect.git]
+no_pushes = true

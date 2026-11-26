@@ -1,0 +1,129 @@
+# Simulation profile (default). Every port is a fake; no network.
+# The network guard fails the run on any non-local socket.
+
+profile = "sim"
+
+[plugins.ticket_system]
+adapter = "ticket_system.fake"
+settings = { fixtures = "tests/scenarios/fixtures/tickets.toml" }
+
+[plugins.git_host]
+adapter = "git_host.fake"
+settings = { repos_root = "var/sim/repos" }
+
+[plugins.mailbox]
+adapter = "mailbox.fake"
+
+[models.providers.scripted]
+adapter = "model_provider.scripted"
+settings = { scripts = "tests/scenarios/fixtures/model_scripts" }
+
+[harnesses.scripted]
+adapter = "harness.scripted"
+
+[plugins.sandbox]
+adapter = "sandbox.local_dir"
+settings = { root = "var/sim/workspaces" }
+
+[plugins.notifier]
+adapter = "notifier.fake"
+
+[plugins.monitor]
+adapter = "monitor.fake"
+
+[plugins.accounting]
+adapter = "accounting.memory"
+
+[plugins.state_store]
+adapter = "state_store.memory"
+
+[plugins.clock]
+adapter = "clock.fake"
+
+[plugins.id_source]
+adapter = "id_source.sequential"
+
+[workflow.statuses]
+ready = "Ready for AI"
+in_progress = "In Progress"
+spec_review = "Spec Review"
+in_review = "In Review"
+needs_info = "Waiting for Info"
+blocked = "Blocked"
+stalled = "Open"
+failed = "Open"
+done = "Done"
+
+[workflow]
+priority_order = ["Highest", "High", "Medium", "Low", "Lowest"]
+
+[workflow.fields]
+lease_owner = "customfield_10001"
+lease_expires = "customfield_10002"
+repo = "customfield_10003"
+acceptance_criteria = "customfield_10004"
+verify_steps = "customfield_10005"
+sponsor_team = "customfield_10006"
+source_ref = "customfield_10007"
+fingerprint = "customfield_10008"
+
+[workflow.link_types]
+relates = "Relates"
+blocks = "Blocks"
+duplicates = "Duplicate"
+
+[labels]
+ready = "ai-ready"
+failed = "ai-failed"
+needs_info = "ai-needs-info"
+stalled = "ai-stalled"
+spec_approved = "ai-spec-approved"
+
+[collaboration]
+factory_identity = "svc-factory"
+bot_identities = ["svc-other-bot"]
+[collaboration.allowed_commenters]
+users = ["alice", "bob"]
+groups = ["factory-reviewers"]
+include_reporter = true
+
+[intake.email]
+allowlisted_senders = ["alice@sim.invalid"]
+default_project = "SIM"
+default_issue_type = "Task"
+
+[intake.gitlab]
+default_project = "SIM"
+default_issue_type = "Task"
+
+[models.stages.triage]
+provider = "scripted"
+model = "sim-small"
+[models.stages.spec]
+provider = "scripted"
+model = "sim-large"
+[models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "scripted"
+[models.stages.review]
+provider = "scripted"
+model = "sim-reviewer"
+[models.stages.intake]
+provider = "scripted"
+model = "sim-small"
+[models.stages.grading]
+provider = "scripted"
+model = "sim-small"
+[models.stages.respond]
+provider = "scripted"
+model = "sim-small"
+
+[notifications]
+spec_review = ["carol"]
+mr_ready = ["carol"]
+failed = ["carol"]
+
+[trace_store.local_fs]
+root = "var/sim/traces"
+retry_queue = "var/sim/trace-retry"

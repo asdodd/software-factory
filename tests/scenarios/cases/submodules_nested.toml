@@ -1,0 +1,20 @@
+name = "nested and relative-URL submodules are checked out at their recorded commits"
+include = ["_common.toml", "_submodules.toml"]
+agent_files = ["agents/app-bot.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/app.py", content = "from vendor.core import core  # updated\n" },
+  { result = { status = "done", summary = "Updated app." } },
+]
+
+[[steps]]
+run = "app-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+files_include = ["vendor/core/core.py", "vendor/core/deep/deep.py"]
+files_exclude = ["vendor/core/later.py"]

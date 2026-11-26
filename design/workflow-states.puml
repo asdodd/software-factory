@@ -1,0 +1,22 @@
+@startuml workflow-states
+title Logical ticket states (native names come from [workflow.statuses])
+[*] --> ready : readiness gate passes\n+ ready label
+ready --> in_progress : claim (assignee + lease)
+in_progress --> ready : lease expired -> reclaimable
+in_progress --> spec_review : hard ticket, spec posted
+spec_review --> in_progress : spec approved\n(spec_approved label)
+in_progress --> needs_info : numbered questions
+spec_review --> needs_info
+needs_info --> in_progress : allowed human reply
+needs_info --> stalled : stall_timeout_hours
+in_progress --> blocked : restricted file / submodule failure
+in_progress --> failed : max_attempts or spend cap
+in_progress --> in_review : MR opened / branch pushed
+in_review --> in_review : MR comment loop
+in_review --> done : human merges
+done --> [*]
+note right of in_review
+  The factory never sets done itself;
+  humans or CI close the ticket on merge.
+end note
+@enduml

@@ -1,0 +1,33 @@
+name = "secrets are redacted from traces and comments"
+include = ["_common.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+description = "Use the key AKIAABCDEFGHIJKLMNOP and password=hunter2hunter2 to test."
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply. token=supersecretvalue123" } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_exclude = ["supersecretvalue123", "AKIAABCDEFGHIJKLMNOP", "hunter2hunter2"]
+[expect.trace]
+runs = 1
+excludes = ["AKIAABCDEFGHIJKLMNOP", "hunter2hunter2", "supersecretvalue123"]
+includes = ["[REDACTED]"]

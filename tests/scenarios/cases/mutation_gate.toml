@@ -1,0 +1,29 @@
+name = "a low mutation score on changed code fails the gate (tautological tests)"
+include = ["_ticket.toml", "_good_change.toml"]
+
+[[repos]]
+path = "web/portal"
+[repos.files]
+"src/calc.py" = "def add(a, b):\n    return a + b\n"
+".factory/rules.toml" = """
+[commands]
+test = [["python3", "-c", "print('tests pass')"]]
+[mutation]
+command = ["python3", "-c", "import json; json.dump({'files': {'src/calc.py': {'mutants': [{'status': 'Survived'}, {'status': 'Survived'}, {'status': 'Killed'}]}}}, open('mutation.json', 'w'))"]
+report = "mutation.json"
+format = "stryker"
+"""
+
+[[model]]
+stage = "triage"
+content = { difficulty = "easy", reason = "small" }
+repeat = true
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["mutation score 33% on changed code is below 60%"]

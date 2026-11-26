@@ -1,0 +1,49 @@
+name = "the builtin harness is denied every route to a restricted file, and repeated attempts stop the run"
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "builtin"
+
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "read_file", arguments = { path = "proprietary/algo.py" } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "read_file", arguments = { path = "src/link.py" } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "run_command", arguments = { argv = ["cat", "proprietary/algo.py"] } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "run_command", arguments = { argv = ["grep", "-r", "42", "."] } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "run_command", arguments = { argv = ["git", "show", "HEAD:proprietary/algo.py"] } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "run_command", arguments = { argv = ["git", "log", "-p", "--", "src/vendor_algo.py"] } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "read_file", arguments = { path = "../clone/proprietary/algo.py" } }]
+[[model]]
+stage = "implement"
+tool_calls = [{ name = "read_file", arguments = { path = "src/../docs/Proprietary-Notes.md" } }]
+
+[[steps]]
+run = "secure-bot"
+
+[expect]
+outcomes = ["blocked"]
+denials_at_least = 5
+[[expect.tickets]]
+key = "SIM-1"
+status = "Blocked"
+comments_contain = ["Stopped after 5 attempts to read files restricted by the access policy."]
+comments_exclude = ["TOPSECRET"]
+[expect.git]
+no_pushes = true
+[expect.trace]
+excludes = ["TOPSECRET"]

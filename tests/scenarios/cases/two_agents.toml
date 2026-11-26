@@ -1,0 +1,52 @@
+name = "two agents with different filters each claim only their own tickets"
+include = ["_common.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+[[tickets]]
+key = "SIM-2"
+summary = "Explain setup in the intro"
+status = "Ready for AI"
+labels = ["ai-ready-docs"]
+components = ["docs"]
+[tickets.fields]
+repo = "docs/handbook"
+acceptance_criteria = "- intro explains setup"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+[[harness]]
+ticket = "SIM-2"
+actions = [
+  { write = "guide/intro.md", content = "# Intro\n\nRun `make setup` first.\n" },
+  { result = { status = "done", summary = "Explained setup." } },
+]
+
+[[steps]]
+run_all = true
+
+[expect]
+outcomes = ["branch_pushed", "mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+assignee = "svc-factory-frontend"
+[[expect.tickets]]
+key = "SIM-2"
+status = "In Review"
+assignee = "svc-factory-docs"
+[expect.git]
+mrs = 1
+pushed_branches = ["ai/frontend-bot/SIM-1", "ai/docs-bot/SIM-2"]

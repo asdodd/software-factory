@@ -1,0 +1,22 @@
+name = "a CLI agent's needs_info status line pauses the ticket with its questions"
+include = ["_common.toml", "_ticket.toml"]
+process_env = { PATH = "{scenario_dir}/fixtures/bin:{PATH}" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "codex"
+
+[[model]]
+stage = "implement"
+content = { status = "needs_info", questions = ["Integers only, or floats too?"] }
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-needs-info"]
+comments_contain = ["1. Integers only, or floats too?"]

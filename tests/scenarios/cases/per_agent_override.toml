@@ -1,0 +1,59 @@
+name = "per-agent feature override: spec is on for frontend-bot and off for docs-bot"
+include = ["_common.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Redesign the calculator"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+reporter = "alice"
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- new design"
+
+[[tickets]]
+key = "SIM-2"
+summary = "Restructure the handbook"
+status = "Ready for AI"
+labels = ["ai-ready-docs"]
+components = ["docs"]
+[tickets.fields]
+repo = "docs/handbook"
+acceptance_criteria = "- new structure"
+
+[[model]]
+stage = "triage"
+ticket = "SIM-1"
+content = { difficulty = "hard", reason = "design work" }
+[[model]]
+stage = "triage"
+ticket = "SIM-2"
+content = { difficulty = "hard", reason = "large" }
+[[model]]
+stage = "spec"
+ticket = "SIM-1"
+content = "Product spec: ...\nTech spec: ..."
+
+[[harness]]
+ticket = "SIM-2"
+actions = [
+  { write = "guide/intro.md", content = "# Intro\n\nNew structure.\n" },
+  { result = { status = "done", summary = "Restructured." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+run = "docs-bot"
+
+[expect]
+outcomes = ["spec_review", "branch_pushed"]
+notifications = 2
+[[expect.tickets]]
+key = "SIM-1"
+status = "Spec Review"
+comments_contain = ["Spec ready for review", "Product spec"]
+[[expect.tickets]]
+key = "SIM-2"
+status = "In Review"

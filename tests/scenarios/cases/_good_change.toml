@@ -1,0 +1,7 @@
+# A valid change to web/portal, used by scenarios that need a successful harness run.
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]

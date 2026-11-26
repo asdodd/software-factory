@@ -1,0 +1,23 @@
+# The single shared readiness checklist. Intake and workers both load this file.
+# Each check names a deterministic rule implemented in factory/core/readiness.py;
+# thresholds come from [limits] in config.
+
+[[checks]]
+id = "repo"
+rule = "repo_identified"
+message = "The repo is not identified (set the repo field)."
+
+[[checks]]
+id = "acceptance_criteria"
+rule = "acceptance_criteria_stated"
+message = "Acceptance criteria are not stated."
+
+[[checks]]
+id = "verify"
+rule = "verification_known"
+message = "How to verify is not stated, and the repo rules file does not define verify or test commands."
+
+[[checks]]
+id = "bounded"
+rule = "scope_bounded"
+message = "The ticket is too large for one change; split it."

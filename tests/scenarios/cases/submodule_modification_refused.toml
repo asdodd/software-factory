@@ -1,0 +1,21 @@
+name = "changes inside a submodule are refused by the gates"
+include = ["_common.toml", "_submodules.toml"]
+agent_files = ["agents/app-bot.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "vendor/core/core.py", content = "CORE = 2\n" },
+  { result = { status = "done", summary = "Patched the vendored lib." } },
+]
+
+[[steps]]
+run = "app-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["submodule vendor/core is outside this agent's scope"]
+[expect.git]
+no_pushes = true

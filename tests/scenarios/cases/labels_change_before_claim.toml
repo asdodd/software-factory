@@ -1,0 +1,19 @@
+name = "a ticket whose labels change between listing and claiming is not claimed"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+
+[[hooks]]
+after = "search"
+ticket = "SIM-1"
+action = "set_labels"
+remove = ["ai-ready-frontend"]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = []
+metrics = { claim_skipped = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+status = "Ready for AI"
+bot_comments = 0

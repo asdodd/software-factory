@@ -1,0 +1,7 @@
+name = "reviewing with the implementer's own model is flagged"
+include = ["_common.toml"]
+[settings.models.stages.review]
+provider = "scripted"
+model = "sim-large"
+[expect]
+warnings_contain = ["review uses the same provider and model as implement"]

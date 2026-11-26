@@ -1,0 +1,17 @@
+name = "a missing jam binary fails the ticket with a clear reason"
+include = ["_common.toml", "_ticket.toml"]
+process_env = { PATH = "/usr/bin:/bin" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "jam-claude"
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["jam is not installed in the sandbox"]

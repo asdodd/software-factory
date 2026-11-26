@@ -1,0 +1,23 @@
+name = "frontend-bot"
+enabled = true
+service_account = "svc-factory-frontend"
+team = "frontend"
+repos = ["web/portal", "web/design-system"]
+
+[filter]
+labels_any = ["ai-ready-frontend"]
+labels_none = ["ai-failed", "ai-needs-info"]
+projects = ["SIM"]
+components = ["ui", "portal"]
+issue_types = ["Task", "Bug"]
+statuses = ["Ready for AI"]
+
+[claim]
+order = ["priority", "created"]
+max_in_flight = 2
+
+[overrides.labels]
+ready = "ai-ready-frontend"
+
+[overrides.limits]
+max_files_changed = 20

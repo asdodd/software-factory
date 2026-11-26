@@ -1,0 +1,86 @@
+@startuml ports
+title Port interfaces (factory/ports/*.py)
+hide empty members
+interface TicketSystem {
+  search(filter, cursor, limit) : Page[Ticket]
+  get(key) : Ticket
+  create(draft) : Ticket  <<idempotent>>
+  update(key, update) : Ticket
+  transition(key, to_status) : Ticket
+  add_comment(key, body, idempotency_key) : Comment
+  edit_comment(key, comment_id, body) : Comment
+  list_comments(key, cursor) : Page[Comment]
+  link(source, target, kind)
+  set_labels(key, add, remove) : Ticket
+  validate_filter(filter)
+}
+interface GitHost {
+  clone(repo, dest, ref) : CheckoutResult
+  pull(workspace) : CheckoutResult  <<ff-only>>
+  create_branch(workspace, name, from_ref)
+  push_branch(workspace, branch) : str
+  compare_url(repo, base, head) : str?
+  open_merge_request(draft) : MergeRequest
+  get_merge_request(repo, id) : MergeRequest
+  list_mr_comments(repo, id, cursor) : Page[MrComment]
+  reply_in_thread(repo, id, thread, body, key) : MrComment
+  post_suggestion(repo, id, suggestion, key) : MrComment
+  poll_comment_events(cursor) : Page[HostCommentEvent]
+}
+interface Mailbox {
+  poll(cursor) : Page[MailMessage]
+  get_thread(thread_id) : MailThread
+  send_reply(reply) : str
+  mark_processed(message_id)
+}
+interface ModelProvider {
+  complete(request) : ModelResponse
+}
+interface AgentHarness <<bring your own>> {
+  run(task: HarnessTask) : HarnessResult
+}
+note right of AgentHarness
+  task: isolated workspace, instructions file,
+  result file, gateway endpoint + per-run token,
+  timeout, max_turns. No upstream credentials.
+end note
+interface Sandbox {
+  prepare(spec) : Workspace
+  run(workspace, command) : CommandResult
+  collect_artifacts(workspace, patterns)
+  teardown(workspace)
+}
+interface AccessGuard {
+  check_path(root, path) : AccessDecision
+  check_command(root, argv) : AccessDecision
+  check_attachment(name, content) : AccessDecision
+  scan_workspace(root) : ScanReport
+  filter_output(text) : FilteredOutput
+  check_diff_paths(paths) : AccessDecision
+}
+interface Notifier { notify(notification) }
+interface Monitor { poll_findings(cursor) : Page[Finding] }
+interface TraceWriter {
+  put_run(meta, events, artifacts)
+  append_outcome(record)
+  flush()
+}
+interface TraceReader {
+  get(run_id)
+  list(query) : Iterator[RunMeta]
+}
+interface TraceStore
+TraceStore --|> TraceWriter
+TraceStore --|> TraceReader
+interface Accounting {
+  record(spend)
+  spent_tokens(scope, since) : int
+  check(context, estimated) : BudgetDecision
+}
+interface StateStore <<proposed>> {
+  get / put / delete
+  compare_and_set(ns, key, expected, value) : bool
+}
+interface Clock { now() : datetime }
+interface IdSource { new_id(prefix) : str }
+@enduml

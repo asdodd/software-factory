@@ -1,0 +1,26 @@
+name = "not-ready ticket is bounced with the missing items"
+include = ["_common.toml"]
+
+[[tickets]]
+key = "SIM-2"
+summary = "Make it better"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["bounced"]
+[[expect.tickets]]
+key = "SIM-2"
+status = "Waiting for Info"
+labels_include = ["ai-needs-info"]
+labels_exclude = ["ai-ready-frontend"]
+lease_released = true
+comments_contain = ["Not ready", "1. Acceptance criteria are not stated."]
+[expect.git]
+no_pushes = true

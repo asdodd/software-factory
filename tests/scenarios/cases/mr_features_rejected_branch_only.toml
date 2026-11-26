@@ -1,0 +1,6 @@
+name = "mr.* features are rejected at startup when the mode is branch_only"
+include = ["_common.toml"]
+[overrides]
+output_mode = "branch_only"
+[expect]
+startup_error = "requires output.mode = merge_request"

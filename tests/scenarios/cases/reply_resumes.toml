@@ -1,0 +1,20 @@
+name = "a human Jira reply resumes the paused ticket and the answer reaches the harness"
+include = ["_common.toml", "_ticket.toml", "_paused.toml", "_second_run_good.toml"]
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "bob", body = "Yes, round to 2 decimals." }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info", "mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+paused = false
+labels_exclude = ["ai-needs-info"]
+comments_contain = ["Needs more information", "Resumed", "Ready for human review"]
+[expect.harness_observed]
+instructions_contain = ["## Answers from the ticket", "Yes, round to 2 decimals."]
+[expect.git]
+mrs = 1

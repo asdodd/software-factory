@@ -1,0 +1,80 @@
+name = "happy path: ready ticket becomes a verified MR"
+
+[[repos]]
+path = "web/portal"
+[repos.files]
+"src/calc.py" = """
+def add(a, b):
+    return a + b
+"""
+"tests/test_calc.py" = """
+import sys, unittest
+sys.path.insert(0, "src")
+from calc import add
+
+class T(unittest.TestCase):
+    def test_add(self):
+        self.assertEqual(add(2, 3), 5)
+
+if __name__ == "__main__":
+    unittest.main()
+"""
+".factory/rules.toml" = """
+standards = ["STANDARDS.md"]
+evidence = ["evidence/*.txt"]
+[commands]
+test = [["python3", "-m", "unittest", "discover", "-s", "tests"]]
+verify = [["python3", "tests/test_calc.py"]]
+"""
+"STANDARDS.md" = "Functions are small and tested."
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+reporter = "alice"
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply(a, b) returns the product\n- it is tested"
+verify_steps = "python3 tests/test_calc.py"
+
+[[model]]
+stage = "triage"
+content = { difficulty = "easy", reason = "one function" }
+[[model]]
+stage = "review"
+content = { summary = "Adds multiply.", blast_radius = "calc module only", merge_danger = "low", architecture_diff = "calc: +multiply" }
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { write = "tests/test_calc.py", content = "import sys, unittest\nsys.path.insert(0, \"src\")\nfrom calc import add, multiply\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(2, 3), 5)\n\n    def test_multiply(self):\n        self.assertEqual(multiply(4, 5), 20)\n\nif __name__ == \"__main__\":\n    unittest.main()\n" },
+  { write = "evidence/run.txt", content = "multiply(4, 5) = 20\n" },
+  { result = { status = "done", summary = "Added multiply with a test." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+notified = [["mr_ready", ["carol", "alice"]]]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+lease_released = true
+assignee = "svc-factory-frontend"
+comments_contain = ["Ready for human review", "fake://web/portal/-/merge_requests/1"]
+[expect.git]
+mrs = 1
+pushed_branches = ["ai/frontend-bot/SIM-1"]
+mr_description_contains = ["```plantuml", "component \"src", "## What changed", "## Blast radius", "calc module only", "## How verified", "evidence/run.txt"]
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "ai/frontend-bot/SIM-1"
+contains = { "src/calc.py" = "def multiply" }
+[expect.trace]
+runs = 1

@@ -1,0 +1,9 @@
+name = "secure-bot"
+service_account = "svc-secure"
+team = "platform"
+repos = ["web/secure"]
+[filter]
+labels_any = ["ai-ready-frontend"]
+statuses = ["Ready for AI"]
+[overrides.labels]
+ready = "ai-ready-frontend"

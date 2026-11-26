@@ -1,0 +1,9 @@
+name = "the S3 trace backend fails validation without an encryption mode"
+[settings.trace_store]
+backend = "s3"
+[settings.trace_store.s3]
+endpoint_url = "https://s3.internal.invalid"
+bucket = "traces"
+encryption = { mode = "" }
+[expect]
+startup_error = "trace_store.s3.encryption.mode is required"

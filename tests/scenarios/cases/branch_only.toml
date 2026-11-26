@@ -1,0 +1,19 @@
+name = "branch_only mode pushes a branch and posts the summary to Jira, with no MR"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+
+[overrides]
+output_mode = "branch_only"
+disable = ["mr.read_comments", "mr.respond", "mr.auto_fix"]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["branch_pushed"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+comments_contain = ["Branch: ai/frontend-bot/SIM-1", "Compare: fake://web/portal/-/compare/main...ai/frontend-bot/SIM-1", "## What changed", "## Blast radius", "## How verified"]
+[expect.git]
+mrs = 0
+pushed_branches = ["ai/frontend-bot/SIM-1"]

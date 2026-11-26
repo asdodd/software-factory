@@ -1,0 +1,7 @@
+name = "sneaky-bot"
+service_account = "svc-sneaky"
+repos = ["web/portal"]
+[filter]
+labels_any = ["ai-ready"]
+[access_policy]
+enabled = false

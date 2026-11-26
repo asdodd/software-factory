@@ -1,0 +1,146 @@
+# EXAMPLE staging profile. Same shape as prod.toml; dry_run on so no external writes happen.
+# Every empty string below must be filled in; `factory config validate --profile prod`
+# lists any that are still empty. Allowed-commenter lists ship empty on purpose:
+# the agent ignores all replies until you add people.
+
+profile = "staging"
+
+[plugins.ticket_system]
+adapter = "ticket_system.jira"
+[plugins.ticket_system.settings]
+base_url = ""
+auth = "bearer"
+token = { env = "FACTORY_JIRA_TOKEN" }
+timeout_seconds = 30
+max_retries = 3
+ca_bundle_path = ""
+
+[plugins.git_host]
+adapter = "git_host.gitlab"
+[plugins.git_host.settings]
+base_url = ""
+token = { env = "FACTORY_GITLAB_TOKEN" }
+timeout_seconds = 30
+watched_groups = []
+
+[plugins.mailbox]
+adapter = "mailbox.imap_smtp"
+[plugins.mailbox.settings]
+address = ""
+imap_host = ""
+smtp_host = ""
+folder = "INBOX"
+processed_folder = "Processed"
+password = { env = "FACTORY_MAIL_PASSWORD" }
+
+# Bring your own model: add more [models.providers.<name>] blocks as needed.
+[models.providers.primary]
+adapter = "model_provider.openai_compatible"
+[models.providers.primary.settings]
+base_url = ""
+api_key = { env = "FACTORY_MODEL_API_KEY" }
+timeout_seconds = 300
+ca_bundle_path = ""
+
+[plugins.sandbox]
+adapter = "sandbox.local_dir"
+settings = { root = "/var/lib/factory/workspaces" }
+
+[plugins.notifier]
+adapter = "notifier.ticket_comment"
+settings = { mention_format = "[~{user}]" }
+
+[plugins.monitor]
+adapter = "monitor.fake"
+
+[plugins.accounting]
+adapter = "accounting.sqlite"
+settings = { path = "/var/lib/factory/accounting.db" }
+
+[plugins.state_store]
+adapter = "state_store.sqlite"
+settings = { path = "/var/lib/factory/state.db" }
+
+[plugins.clock]
+adapter = "clock.system"
+
+[plugins.id_source]
+adapter = "id_source.uuid"
+
+[workflow.statuses]
+ready = ""
+in_progress = ""
+spec_review = ""
+in_review = ""
+needs_info = ""
+blocked = ""
+stalled = ""
+failed = ""
+done = ""
+
+[workflow.fields]
+lease_owner = ""
+lease_expires = ""
+repo = ""
+acceptance_criteria = ""
+verify_steps = ""
+sponsor_team = ""
+source_ref = ""
+fingerprint = ""
+
+[workflow.link_types]
+relates = ""
+blocks = ""
+duplicates = ""
+
+[labels]
+ready = ""
+failed = ""
+needs_info = ""
+stalled = ""
+spec_approved = ""
+
+[models.stages.triage]
+provider = "primary"
+model = ""
+[models.stages.spec]
+provider = "primary"
+model = ""
+[models.stages.implement]
+provider = "primary"
+model = ""
+harness = "builtin"
+[models.stages.review]
+provider = "primary"
+model = ""
+[models.stages.intake]
+provider = "primary"
+model = ""
+[models.stages.grading]
+provider = "primary"
+model = ""
+[models.stages.respond]
+provider = "primary"
+model = ""
+
+[collaboration]
+factory_identity = ""
+
+[trace_store]
+backend = "s3"
+[trace_store.s3]
+endpoint_url = ""
+region = ""
+bucket = ""
+addressing = "path"
+tls = { verify = true, ca_bundle_path = "" }
+encryption = { mode = "sse-kms", kms_key_id = "" }
+[trace_store.s3.write_credentials]
+access_key_id = { env = "FACTORY_TRACE_WRITE_KEY_ID" }
+secret_access_key = { env = "FACTORY_TRACE_WRITE_SECRET" }
+[trace_store.s3.read_credentials]
+access_key_id = { env = "FACTORY_TRACE_READ_KEY_ID" }
+secret_access_key = { env = "FACTORY_TRACE_READ_SECRET" }
+
+[features]
+dry_run = true

@@ -1,0 +1,19 @@
+# web/secure holds restricted files reachable by every route: by name, by
+# content header, through a symlink, in a directory, and inside a submodule.
+[[repos]]
+path = "libs/keys"
+[repos.files]
+"util.py" = "UTIL = 1\n"
+"proprietary/keys.txt" = "TOPSECRET-KEY\n"
+
+[[repos]]
+path = "web/secure"
+submodules = { "vendor/keys" = "../../libs/keys.git" }
+symlinks = { "src/link.py" = "../proprietary/algo.py" }
+[repos.files]
+"src/calc.py" = "def add(a, b):\n    return a + b\n"
+"proprietary/algo.py" = "TOPSECRET-ALGO = 42\n"
+"src/vendor_algo.py" = "# PROPRIETARY - do not distribute\nTOPSECRET-HEADER = 1\n"
+"docs/Proprietary-Notes.md" = "TOPSECRET-NOTES\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
+

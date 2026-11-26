@@ -1,0 +1,45 @@
+@startuml collaboration
+title Collaboration loops (Jira replies and MR comments)
+participant "Worker" as W
+participant "Push library" as P
+participant "TicketSystem" as T
+participant "GitHost" as G
+actor "Allowed human" as H
+
+== Needs more information (jira_comments.*) ==
+W -> P: needs_info(questions)
+P -> T: add_comment(numbered questions, idempotency key)
+P -> T: label needs_info OR transition needs_info
+W -> W: pause run (lease hold | release)
+loop every poll_interval_seconds
+  W -> T: list_comments(cursor)
+  alt comment from bot / self / not allowed
+    W -> W: ignore + log (body never read as instructions)
+  else allowed answer
+    W -> W: resume with answer (task-level only;\nlimits/config/filters/protected paths immutable)
+  else ambiguous and rounds < max_question_rounds
+    W -> P: ask again
+  end
+end
+alt no answer after stall_timeout_hours
+  P -> T: label stalled, release lease
+end
+
+== MR comments (output.mode = merge_request) ==
+loop every mr.poll_interval_seconds until merged/closed/inactive
+  W -> G: list_mr_comments(own MR, cursor)
+  alt question and mr.respond
+    W -> P: reply_in_thread
+  else change request and mr.auto_fix and rounds < max_fix_rounds
+    W -> W: fix on OWN branch, re-run gates
+    W -> G: push_branch(own branch)
+    W -> P: reply "what changed"
+  else ambiguous
+    W -> P: clarifying question in thread
+  else "/apply"
+    W -> P: open follow-up MR with suggestions
+  end
+end
+W -> P: summarize MR outcome on ticket (if jira_comments.post)
+note over H, G: Humans resolve threads (mr.resolve_threads = false)
+@enduml

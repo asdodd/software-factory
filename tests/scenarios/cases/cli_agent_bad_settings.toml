@@ -1,0 +1,10 @@
+name = "an unknown CLI agent in harness settings is a startup error"
+[settings.harnesses.mystery]
+adapter = "harness.cli_agent"
+settings = { agent = "copilot" }
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "mystery"
+[expect]
+startup_error = "harnesses.mystery.settings.agent must be one of claude, cline, codex"

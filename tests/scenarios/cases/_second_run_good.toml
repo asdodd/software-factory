@@ -1,0 +1,7 @@
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return round(a * b, 2)\n" },
+  { result = { status = "done", summary = "Added multiply with rounding." } },
+]

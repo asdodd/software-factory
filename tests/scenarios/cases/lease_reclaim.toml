@@ -1,0 +1,42 @@
+name = "an expired lease is reclaimed; a live one is left alone"
+include = ["_common.toml", "_good_change.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "In Progress"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+assignee = "svc-factory-frontend"
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply(a, b) returns the product"
+lease_owner = "frontend-bot:crashed-worker"
+lease_expires = "2026-01-05T06:00:00+00:00"
+
+[[tickets]]
+key = "SIM-3"
+summary = "Add divide to calc"
+status = "In Progress"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- divide"
+lease_owner = "frontend-bot:busy-worker"
+lease_expires = "2026-01-05T10:30:00+00:00"
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+comments_contain = ["Reclaimed after lease expiry"]
+[[expect.tickets]]
+key = "SIM-3"
+status = "In Progress"
+lease_owner = "frontend-bot:busy-worker"
+bot_comments = 0

@@ -1,0 +1,26 @@
+name = "the codex harness preset works end to end through the gateway, isolated"
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+process_env = { PATH = "{scenario_dir}/fixtures/bin:{PATH}", SIM_SECRET = "nope-nope-nope" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "codex"
+
+[[model]]
+stage = "implement"
+content = { path = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" }
+
+[[steps]]
+run = "secure-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+mrs = 1
+mr_description_contains = ["ISOLATION-OK via codex"]
+[[expect.git.branch_files]]
+path = "web/secure"
+branch = "ai/secure-bot/SIM-1"
+contains = { "src/calc.py" = "def multiply" }

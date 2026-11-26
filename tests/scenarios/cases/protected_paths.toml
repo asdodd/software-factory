@@ -1,0 +1,23 @@
+name = "a harness that edits protected paths never gets past the gates"
+include = ["_common.toml", "_ticket.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = ".gitlab-ci.yml", content = "test:\n  script: echo skip\n" },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Done (and relaxed CI)." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-failed"]
+comments_contain = ["protected path changed: .gitlab-ci.yml"]
+[expect.git]
+no_pushes = true
+mrs = 0

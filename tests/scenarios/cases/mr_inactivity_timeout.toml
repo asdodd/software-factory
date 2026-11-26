@@ -1,0 +1,12 @@
+name = "the agent stops watching an MR after the inactivity timeout"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[[steps]]
+advance_hours = 337
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["No review activity for 14 days."]

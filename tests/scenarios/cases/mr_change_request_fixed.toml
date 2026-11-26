@@ -1,0 +1,36 @@
+name = "a change request is fixed with a commit on the agent's own branch only"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[[model]]
+stage = "respond"
+content = { kind = "change_request", reply = "I will add a docstring." }
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    \"\"\"Return a times b.\"\"\"\n    return a * b\n" },
+  { result = { status = "done", summary = "Added a docstring." } },
+]
+
+[[steps]]
+mr_comment = { author = "bob", body = "Please add a docstring to multiply.", thread = "t-fix" }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened", "fix_pushed"]
+[expect.harness_observed]
+instructions_contain = ["A reviewer asked on the merge request: Please add a docstring to multiply."]
+[expect.git]
+mrs = 1
+push_counts = { "ai/frontend-bot/SIM-1" = 2 }
+mr_replies_contain = ["Pushed", "Added a docstring."]
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "ai/frontend-bot/SIM-1"
+contains = { "src/calc.py" = "Return a times b." }
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "main"
+unchanged = { "src/calc.py" = "def add(a, b):\n    return a + b\n" }

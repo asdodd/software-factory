@@ -1,0 +1,17 @@
+name = "an ambiguous MR comment produces a clarifying question"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[[model]]
+stage = "respond"
+content = { kind = "ambiguous", reply = "Do you want multiply to accept floats, or only ints?" }
+
+[[steps]]
+mr_comment = { author = "bob", body = "Hmm, not sure about this.", thread = "t-a" }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+push_counts = { "ai/frontend-bot/SIM-1" = 1 }
+mr_replies_contain = ["Do you want multiply to accept floats, or only ints?"]

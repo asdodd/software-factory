@@ -1,0 +1,31 @@
+name = "per-ticket spend cap stops the run and fails the ticket with a summary"
+include = ["_ticket.toml", "_good_change.toml"]
+
+[[repos]]
+path = "web/portal"
+[repos.files]
+"src/calc.py" = "def add(a, b):\n    return a + b\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
+
+[settings.limits]
+max_tokens_per_ticket = 5000
+
+[[model]]
+stage = "triage"
+content = { difficulty = "easy", reason = "small" }
+input_tokens = 6000
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "Open"
+labels_include = ["ai-failed"]
+labels_exclude = ["ai-ready-frontend"]
+lease_released = true
+comments_contain = ["Spend cap reached", "would exceed its cap of 5000 tokens"]
+[expect.git]
+no_pushes = true
