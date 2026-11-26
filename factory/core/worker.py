@@ -19,7 +19,7 @@ from pathlib import Path
 
 from factory.config.schema import RepoRules
 from factory.config.validate import ConfigError, build
-from factory.core import architecture, gates, instructions, quality, readiness, workspace
+from factory.core import architecture, gates, instructions, quality, readiness, skills, workspace
 from factory.core.budget import BudgetedModels
 from factory.core.claim import Claimer
 from factory.core.container import Container
@@ -239,6 +239,12 @@ class _Run:
     def release(self) -> None:
         self.w.claimer.release(self.key)
 
+    def stage_skills(self, stage: str, has_spec: bool, artifacts_dir: str = "", installed: tuple[str, ...] = ()):
+        chosen = skills.select(self.cfg, stage, self.ticket, has_spec, self.w.c.loaded.root)
+        if chosen:
+            self.rec.event("skills", {"stage": stage, "skills": [s.id for s in chosen]}, always=True)
+        return chosen, skills.render(chosen, self.cfg.skills.max_chars_per_stage, artifacts_dir, installed)
+
     def renew(self) -> None:
         if self.fix is None and not self.w.dry_run:
             expires = self.w.clock.now() + timedelta(minutes=self.cfg.limits.lease_minutes)
@@ -357,7 +363,7 @@ class _Run:
         try:
             found, stats, summary, report, copy = self.implement(
                 self.w.state.get("spec", self.key) or "", 0, "", "fix-attempts", f"{f.mr_id}:{f.comment_id}",
-                produce, feedback)
+                produce, feedback, with_skills=not f.apply)
         except GaveUp as exc:
             self.reply(f"I could not produce a change that passes the gates: {exc}", "gave-up")
             return RunReport(self.key, Outcome.FIX_FAILED, str(exc), self.run_id)
@@ -403,8 +409,9 @@ class _Run:
         if not hard or not self.w.features.on("spec"):
             return ""
         self.rec.stage("spec")
-        spec = self.ask_model("spec", "Write a product spec (what) and a tech spec (how) in markdown.",
-                              self.ticket_text())
+        _, spec_skills = self.stage_skills("spec", has_spec=False)
+        system = "Write a product spec (what) and a tech spec (how) in markdown."
+        spec = self.ask_model("spec", f"{system}\n\n{spec_skills}" if spec_skills else system, self.ticket_text())
         self.rec.stage_done("spec")
         spec = self.guard.filter_output(spec).text
         self.w.state.put("spec", self.key, spec)
@@ -477,7 +484,7 @@ class _Run:
     # ---- the implement-and-gate loop -----------------------------------------
     def implement(self, spec: str, withheld: int, attach_dir: str, attempts_ns: str, attempts_key: str,
                   produce: Callable[[Path, Path, Path, SandboxRuntime], HarnessResult],
-                  feedback: list[str] | None = None):
+                  feedback: list[str] | None = None, with_skills: bool = True):
         copy = self.ws.root / "work"
         workspace.isolate(self.clone_root, copy)
         self.guard.scan_workspace(copy)
@@ -493,6 +500,7 @@ class _Run:
         feedback = list(feedback or [])
         initial = list(feedback)
         answers = tuple(self.guard.filter_output(a).text for a in self.answers)
+        skills_text, artifacts = self.prepare_skills(bool(spec)) if with_skills else ("", None)
         while True:
             used = int(self.w.state.get(attempts_ns, attempts_key) or 0)
             if used >= self.cfg.limits.max_attempts:
@@ -506,11 +514,12 @@ class _Run:
             result_file.unlink(missing_ok=True)
             task_file.write_text(instructions.render(self.ticket, self.cfg, self.rules, standards, spec, feedback,
                                                      withheld, str(self.ws.root / attach_dir) if attach_dir else "",
-                                                     answers))
+                                                     answers, skills_text))
             denials_before = len(self.guard.denials)
             self.rec.stage("implement")
             result = produce(copy, task_file, result_file, runtime)
             self.rec.stage_done("implement")
+            self.collect_artifacts(artifacts)
             denied = self.guard.denials[denials_before:]
             for d in denied:
                 self.rec.event("access_denied", {"kind": d.kind, "reason": d.reason}, always=True)
@@ -536,6 +545,31 @@ class _Run:
                 continue
             self.w.state.delete(attempts_ns, attempts_key)
             return found, stats, result.summary, report, copy
+
+    def prepare_skills(self, has_spec: bool) -> tuple[str, Path | None]:
+        """Implement-stage skills: inline text always; CLI agents with a native skills
+        directory also get the folders installed in the sandbox home, and get a
+        working-notes directory outside the repository copy."""
+        stage = self.cfg.models.stages.implement
+        harness = self.w.c.harness(stage.harness)
+        native = tuple(getattr(harness, "native_skill_dirs", ()))
+        cli = self.cfg.harnesses[stage.harness].adapter not in ("harness.builtin", "harness.scripted")
+        artifacts = self.ws.root / ".factory" / "artifacts" if cli else None
+        if artifacts is not None:
+            artifacts.mkdir(parents=True, exist_ok=True)
+        chosen = skills.select(self.cfg, "implement", self.ticket, has_spec, self.w.c.loaded.root)
+        installed: tuple[str, ...] = ()
+        if chosen and native and self.cfg.skills.install_native:
+            installed = tuple(skills.install(chosen, self.ws.root, native))
+        _, text = self.stage_skills("implement", has_spec, str(artifacts) if artifacts else "", installed)
+        return text, artifacts
+
+    def collect_artifacts(self, artifacts: Path | None) -> None:
+        if artifacts is None or not artifacts.is_dir():
+            return
+        for path in sorted(artifacts.rglob("*")):
+            if path.is_file() and not path.is_symlink() and not self.guard.content_matches(path.read_bytes()):
+                self.rec.artifact(Artifact(f"notes/{path.relative_to(artifacts)}", path, "text/markdown"))
 
     def run_harness(self, copy: Path, task_file: Path, result_file: Path, runtime: SandboxRuntime) -> HarnessResult:
         stage = self.cfg.models.stages.implement
@@ -660,13 +694,17 @@ class _Run:
             return {}
         self.rec.stage("review")
         standards = "\n\n".join(text for _, text in self.standards())
+        spec = self.w.state.get("spec", self.key) or ""
+        _, review_skills = self.stage_skills("review", has_spec=bool(spec))
+        system = ("You are reviewing a change you did not write. Check it against the standards and against the "
+                  "ticket (and spec, if any). Reply with JSON "
+                  '{"summary": "...", "blast_radius": "...", "merge_danger": "low"|"medium"|"high", '
+                  '"findings": [{"note": "...", "path": "...", "line_start": n, "line_end": n, "replacement": "..."}], '
+                  '"architecture_diff": "..."}. Give path, lines, and replacement only for concrete suggested changes.')
         raw = self.ask_model(
-            "review",
-            "You are reviewing a change you did not write. Check it against the standards. Reply with JSON "
-            '{"summary": "...", "blast_radius": "...", "merge_danger": "low"|"medium"|"high", '
-            '"findings": [{"note": "...", "path": "...", "line_start": n, "line_end": n, "replacement": "..."}], '
-            '"architecture_diff": "..."}. Give path, lines, and replacement only for concrete suggested changes.',
-            f"Standards:\n{standards}\n\nDiff:\n{diff}")
+            "review", f"{system}\n\n{review_skills}" if review_skills else system,
+            f"Ticket:\n{self.ticket_text()}\n\n" + (f"Approved spec:\n{spec}\n\n" if spec else "")
+            + f"Standards:\n{standards}\n\nDiff:\n{diff}")
         self.rec.stage_done("review")
         try:
             doc = json.loads(raw)

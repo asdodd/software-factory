@@ -21,7 +21,7 @@ def base_skills() -> str:
 
 def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequence[tuple[str, str]],
            spec: str = "", feedback: Sequence[str] = (), withheld_attachments: int = 0,
-           attachments_dir: str = "", answers: Sequence[str] = ()) -> str:
+           attachments_dir: str = "", answers: Sequence[str] = (), skills_text: str = "") -> str:
     parts = [
         "# Factory task",
         base_skills(),
@@ -51,6 +51,8 @@ def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequ
         parts += ["## Attachments", f"Readable attachments are in {attachments_dir}."]
     if withheld_attachments:
         parts.append(f"{withheld_attachments} attachment(s) were withheld by the access policy.")
+    if skills_text:
+        parts.append(skills_text)
     if feedback:
         parts += ["## Previous attempt failed", *(f"- {f}" for f in feedback)]
     parts += ["## When finished",

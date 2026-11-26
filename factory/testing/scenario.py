@@ -417,6 +417,9 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
             for text in ho.get("instructions_contain", []):
                 if text not in obs["instructions"]:
                     fail(f"instructions lack {text!r}")
+            for text in ho.get("instructions_exclude", []):
+                if text in obs["instructions"]:
+                    fail(f"instructions contain {text!r}")
             for var in ho.get("env_excludes", []):
                 if var in obs["env_keys"]:
                     fail(f"harness environment contains {var}")

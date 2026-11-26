@@ -1,0 +1,21 @@
+name = "implement-stage skills are inlined after the base skills, with the factory adapter preamble"
+include = ["_common.toml", "_ticket.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+instructions_exclude = ["### Skill `mattpocock/diagnosing-bugs`", "### Skill `humanlayer-rpi/implement-plan`"]
+instructions_contain = ["# Base skill: no proprietary files", "# How to use the stage skills in the factory", "stop and report `needs_info`", "### Skill `mattpocock/tdd`", "reference: mocking.md"]
+[expect.trace]
+includes = ["mattpocock/tdd"]

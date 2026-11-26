@@ -73,6 +73,12 @@ else:
     sys.exit(f"unknown fake tool {tool}")
 
 need("## Reporting" in prompt, "prompt lacks the reporting footer")
+if os.environ.get("EXPECT_SKILL"):
+    for skill_dir in os.environ.get("EXPECT_SKILL_DIRS", ".claude/skills").split(","):
+        need(os.path.isfile(os.path.join(os.path.expanduser("~"), skill_dir, os.environ["EXPECT_SKILL"], "SKILL.md")),
+             f"skill {os.environ['EXPECT_SKILL']} not installed under ~/{skill_dir}")
+    need("/.factory/artifacts" in prompt, "prompt does not name the working-notes directory")
+    need("### Skill `mattpocock/tdd`" in prompt, "prompt lacks the inline tdd skill")
 edit = json.loads(text)
 if "path" in edit:
     with open(edit["path"], "w") as fh:

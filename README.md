@@ -40,6 +40,28 @@ The agent works with people through Jira comments (questions, answers, a stall t
 - **What every harness gets:** an isolated workspace (restricted files removed, git history replaced) and a loopback model gateway with a per-run token. A harness never gets upstream credentials.
 - **What the factory does itself:** diffs the result, runs the gates, and pushes.
 
+## Stage skills (HumanLayer and Matt Pocock)
+
+The factory vendors third-party skills **unmodified**, with their licenses and the pinned source commit, in `factory/skills/vendor/` (see `SOURCES.toml`):
+- [mattpocock/skills](https://github.com/mattpocock/skills) (MIT);
+- HumanLayer's Research-Plan-Implement skills from [humanlayer/humanlayer](https://github.com/humanlayer/humanlayer) (Apache-2.0, with its NOTICE).
+
+`[skills.stages]` in config maps them to factory stages, and agents can override that under `[overrides.skills]`. These are the defaults:
+
+| Stage | Skills |
+|---|---|
+| spec (hard tickets) | `mattpocock/to-spec`, `humanlayer-rpi/create-plan`, `mattpocock/codebase-design` |
+| implement (and review fixes) | `mattpocock/tdd`, plus `mattpocock/diagnosing-bugs` for Bugs, plus `humanlayer-rpi/create-research` and `humanlayer-rpi/implement-plan` once a spec is approved |
+| review | `mattpocock/code-review`, `mattpocock/pr` |
+| self-improvement | `mattpocock/retro`, `mattpocock/improve-codebase-architecture` |
+
+**How they're delivered:**
+- **Inline:** the selected skills, including their reference files, are rendered into each stage's instructions after the mandatory base skills. The base skills always win.
+- **Native:** for Claude Code and Codex, the skills are also installed into the sandbox's `~/.claude/skills` and `~/.codex/skills`, outside the repository copy.
+- **Adapter preamble** (`factory/skills/adapter.md`): adapts the interactive skills to headless runs. Questions become needs-info, working notes go outside the repo, and the factory performs every external action itself.
+
+`humanlayer-rpi/create-research-questions` and `mattpocock/software-factory` (Matt's design vocabulary for factories) are vendored but not mapped to a stage by default. Your own skill packs can be added with `skills.extra_paths`.
+
 ## Quick start (simulation)
 
 ```sh

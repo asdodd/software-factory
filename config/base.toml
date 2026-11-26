@@ -286,6 +286,46 @@ allowed_paths = ["factory/skills/**", "config/agents/**"]
 max_files = 10
 lookback_days = 14
 
+# Stage skills: optional third-party skills rendered after the mandatory base
+# skills (which always win) and the factory adapter preamble. Vendored packs:
+# mattpocock (MIT) and humanlayer-rpi (Apache-2.0), see factory/skills/vendor/SOURCES.toml.
+# Each entry may add issue_types = [...] or requires_spec = true. Agents can
+# override any stage list under [overrides.skills.stages].
+[skills]
+enabled = true
+max_chars_per_stage = 60000
+install_native = true                    # also copy them into the sandbox's ~/.claude/skills and ~/.codex/skills
+extra_paths = []                         # your own packs: <path>/<pack>/<name>/SKILL.md
+
+[[skills.stages.spec]]
+skill = "mattpocock/to-spec"
+[[skills.stages.spec]]
+skill = "humanlayer-rpi/create-plan"
+[[skills.stages.spec]]
+skill = "mattpocock/codebase-design"
+
+[[skills.stages.implement]]
+skill = "humanlayer-rpi/create-research"
+requires_spec = true
+[[skills.stages.implement]]
+skill = "humanlayer-rpi/implement-plan"
+requires_spec = true
+[[skills.stages.implement]]
+skill = "mattpocock/tdd"
+[[skills.stages.implement]]
+skill = "mattpocock/diagnosing-bugs"
+issue_types = ["Bug"]
+
+[[skills.stages.review]]
+skill = "mattpocock/code-review"
+[[skills.stages.review]]
+skill = "mattpocock/pr"
+
+[[skills.stages.improve]]
+skill = "mattpocock/retro"
+[[skills.stages.improve]]
+skill = "mattpocock/improve-codebase-architecture"
+
 # Who is alerted, by user id (the ticket reporter is added when include_reporter is true).
 [notifications]
 include_reporter = true

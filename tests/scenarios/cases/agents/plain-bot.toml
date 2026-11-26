@@ -1,0 +1,11 @@
+name = "plain-bot"
+service_account = "svc-plain"
+team = "platform"
+repos = ["web/portal"]
+[filter]
+labels_any = ["ai-ready-frontend"]
+statuses = ["Ready for AI"]
+[overrides.labels]
+ready = "ai-ready-frontend"
+[overrides.skills]
+enabled = false

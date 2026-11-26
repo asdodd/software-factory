@@ -213,6 +213,10 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
         if ts.s3.encryption.mode == "sse-kms" and not ts.s3.encryption.kms_key_id:
             out.append(Diagnostic("error", "trace_store.s3.encryption.kms_key_id is required for sse-kms"))
 
+    from factory.core.skills import unknown as unknown_skills
+    for label, conf in [("", cfg), *((f"agent {n}: ", loaded.agent_configs[n]) for n in loaded.enabled_agents())]:
+        for sid in unknown_skills(conf, loaded.root):
+            out.append(Diagnostic("error", f"{label}skills: unknown skill {sid!r} (not vendored and not in skills.extra_paths)"))
     if loaded.features.on("feedback.self_improvement") and not cfg.feedback.self_improvement.repo:
         out.append(Diagnostic("error", "feedback.self_improvement.repo is required when self-improvement is on"))
     if not cfg.access_policy.enabled:

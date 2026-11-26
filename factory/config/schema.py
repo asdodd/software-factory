@@ -412,6 +412,37 @@ class FeedbackConfig:
 
 
 @dataclass(frozen=True)
+class SkillRef:
+    """A stage skill by id ("<pack>/<name>"), optionally conditional on the
+    ticket's issue type or on an approved spec existing."""
+
+    skill: str = ""
+    issue_types: list[str] = field(default_factory=list)
+    requires_spec: bool = False
+
+
+@dataclass(frozen=True)
+class StageSkills:
+    spec: list[SkillRef] = field(default_factory=list)
+    implement: list[SkillRef] = field(default_factory=list)
+    review: list[SkillRef] = field(default_factory=list)
+    improve: list[SkillRef] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SkillsConfig:
+    """Optional third-party skills per stage, rendered after the mandatory base
+    skills (which always win). Vendored packs live in factory/skills/vendor;
+    extra_paths adds your own packs laid out as <path>/<pack>/<name>/SKILL.md."""
+
+    enabled: bool = True
+    stages: StageSkills = field(default_factory=StageSkills)
+    extra_paths: list[str] = field(default_factory=list)
+    max_chars_per_stage: int = 60000
+    install_native: bool = True
+
+
+@dataclass(frozen=True)
 class NotificationsConfig:
     """Who is alerted, by user id. The reporter is added when include_reporter is true."""
 
@@ -463,6 +494,7 @@ class FactoryConfig:
     gates: GatesConfig = field(default_factory=GatesConfig)
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
+    skills: SkillsConfig = field(default_factory=SkillsConfig)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -499,6 +531,7 @@ class AgentOverrides:
     limits: dict[str, object] = field(default_factory=dict)
     models: dict[str, object] = field(default_factory=dict)
     gates: dict[str, object] = field(default_factory=dict)
+    skills: dict[str, object] = field(default_factory=dict)
     features: dict[str, bool] = field(default_factory=dict)
 
 

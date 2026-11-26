@@ -1,0 +1,23 @@
+# Third-party skills vendored unmodified. Update by re-copying from the pinned
+# commit; never edit these files in place (factory adaptations live in
+# factory/skills/adapter.md, which is rendered ahead of them).
+
+[mattpocock]
+repo = "https://github.com/mattpocock/skills"
+commit = "6f7f7831a625f040a8e06a0e7954826b87ce775a"
+license = "MIT"
+license_file = "mattpocock/LICENSE"
+skills = ["tdd", "code-review", "codebase-design", "diagnosing-bugs", "pr", "retro", "to-spec",
+          "improve-codebase-architecture", "software-factory"]
+paths = "skills/engineering/<name> (software-factory: skills/in-progress/software-factory)"
+excluded = "scripts/ directories (executable helpers are not vendored)"
+notes = "pr/CREDITS.md credits Dex Horthy's show-me skill (humanlayer/humanlayer) for its Summary section."
+
+[humanlayer-rpi]
+repo = "https://github.com/humanlayer/humanlayer"
+commit = "fb899cd8cba767f0392708efc20d00938dec6a87"
+license = "Apache-2.0"
+license_file = "humanlayer-rpi/LICENSE"
+notice_file = "humanlayer-rpi/NOTICE"
+skills = ["create-plan", "implement-plan", "create-research-questions", "create-research"]
+paths = "apps/riptide-rpi-claude-plugin/skills/<name>"

@@ -23,6 +23,14 @@ Each of these has a working default today; it's a config change or a small code 
   - self-improvement may edit only `factory/skills/**` and `config/agents/**`;
   - the §8.3 limits and polling defaults.
 
+## Stage skills (HumanLayer and Matt Pocock)
+
+- [ ] **Confirm the skill selection matches your original note.** That note wasn't available in this session, so I chose from the public repos: Matt's engineering skills plus HumanLayer's Research-Plan-Implement skills. Adjust `[skills.stages]` or add packs with `skills.extra_paths`.
+- [ ] **Give the spec stage repository access.** It's a single model call today, so HumanLayer's research skills can only run in the implement stage (after spec approval). Running spec through a harness would let research-questions, research and design-discussion run before the plan, as the RPI workflow intends.
+- [ ] **Decide whether to map the unused skills:** `humanlayer-rpi/create-research-questions`, and Matt's `software-factory` vocabulary for design discussions.
+- [ ] **Refresh the vendored copies** from upstream periodically: re-copy from a new commit and update `factory/skills/vendor/SOURCES.toml`. Never edit them in place.
+- [ ] **Check token cost** of the inline skills per stage (`skills.max_chars_per_stage`, default 60k characters) against your model budget.
+
 ## To go live
 
 See [design/GO_LIVE.md](design/GO_LIVE.md) for the exact keys.

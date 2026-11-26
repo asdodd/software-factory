@@ -1,0 +1,5 @@
+name = "an unknown stage skill is a startup error"
+[[settings.skills.stages.review]]
+skill = "nobody/missing-skill"
+[expect]
+startup_error = "skills: unknown skill 'nobody/missing-skill'"

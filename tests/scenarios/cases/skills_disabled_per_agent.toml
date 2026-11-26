@@ -1,0 +1,16 @@
+name = "an agent can turn stage skills off; the base skills remain"
+include = ["_common.toml", "_ticket.toml"]
+agent_files = ["agents/plain-bot.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [{ observe = true }, { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" }, { result = { status = "done", summary = "ok" } }]
+
+[[steps]]
+run = "plain-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+instructions_exclude = ["How to use the stage skills", "### Skill `"]
+instructions_contain = ["# Base skill: no proprietary files"]

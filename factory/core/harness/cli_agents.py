@@ -144,6 +144,11 @@ class CliAgentHarness:
         )
 
     @property
+    def native_skill_dirs(self) -> tuple[str, ...]:
+        """Where this CLI loads skills from, relative to its home (the sandbox root)."""
+        return {"claude": (".claude/skills",), "codex": (".codex/skills",)}.get(self.agent, ())
+
+    @property
     def dialect(self) -> str:
         return self.preset.dialect
 
