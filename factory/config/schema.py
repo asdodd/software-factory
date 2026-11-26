@@ -132,6 +132,7 @@ class LimitsConfig:
     max_files_changed: int = 15
     max_diff_lines: int = 600
     max_denied_access_attempts: int = 5
+    max_requests_per_ticket: int = 400
     max_ticket_chars: int = 12000
     max_acceptance_criteria: int = 12
 
@@ -332,7 +333,7 @@ class StageModel:
 class StageModels:
     triage: StageModel = field(default_factory=StageModel)
     spec: StageModel = field(default_factory=StageModel)
-    implement: StageModel = field(default_factory=lambda: StageModel(harness="builtin"))
+    implement: StageModel = field(default_factory=StageModel)
     review: StageModel = field(default_factory=StageModel)
     intake: StageModel = field(default_factory=StageModel)
     grading: StageModel = field(default_factory=StageModel)
@@ -342,10 +343,21 @@ class StageModels:
 
 @dataclass(frozen=True)
 class BudgetsConfig:
+    """Token budgets per day, and pacing for request-limited endpoints.
+
+    A request-limited endpoint backs off instead of failing, so the factory
+    paces rather than fails: min_request_interval_seconds spaces every model
+    request through the factory (all agents share it), and requests_per_hour
+    keeps a rolling window. A call waits for its slot; max_wait_seconds = 0
+    means wait as long as it takes (a positive value defers the ticket to a
+    later cycle instead)."""
+
     user_tokens_per_day: int = 0
     team_tokens_per_day: int = 0
     agent_tokens_per_day: int = 0
-    requests_per_minute: int = 0
+    min_request_interval_seconds: float = 0.0
+    requests_per_hour: int = 0
+    max_wait_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -377,7 +389,7 @@ class HarnessConfig:
     `settings` is validated by the adapter (e.g. argv template for harness.command)."""
 
     adapter: str = ""
-    timeout_minutes: int = 60
+    timeout_minutes: int = 360
     max_turns: int = 200
     settings: dict[str, object] = field(default_factory=dict)
 
@@ -409,6 +421,46 @@ class SelfImprovementConfig:
 class FeedbackConfig:
     grading: GradingConfig = field(default_factory=GradingConfig)
     self_improvement: SelfImprovementConfig = field(default_factory=SelfImprovementConfig)
+
+
+@dataclass(frozen=True)
+class CapabilitiesConfig:
+    """What the agent environment allows. Skills, base rules, and CLI flags are
+    rendered to match (see factory/core/conditional.py)."""
+
+    subagents: bool = False
+    internet: bool = False
+
+
+@dataclass(frozen=True)
+class SkillRef:
+    """A stage skill by id ("<pack>/<name>"), optionally conditional on the
+    ticket's issue type or on an approved spec existing."""
+
+    skill: str = ""
+    issue_types: list[str] = field(default_factory=list)
+    requires_spec: bool = False
+
+
+@dataclass(frozen=True)
+class StageSkills:
+    spec: list[SkillRef] = field(default_factory=list)
+    implement: list[SkillRef] = field(default_factory=list)
+    review: list[SkillRef] = field(default_factory=list)
+    improve: list[SkillRef] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SkillsConfig:
+    """Optional third-party skills per stage, rendered after the mandatory base
+    skills (which always win). Vendored packs live in factory/skills/vendor;
+    extra_paths adds your own packs laid out as <path>/<pack>/<name>/SKILL.md."""
+
+    enabled: bool = True
+    stages: StageSkills = field(default_factory=StageSkills)
+    extra_paths: list[str] = field(default_factory=list)
+    max_chars_per_stage: int = 60000
+    delivery: Literal["native", "inline"] = "native"
 
 
 @dataclass(frozen=True)
@@ -463,6 +515,8 @@ class FactoryConfig:
     gates: GatesConfig = field(default_factory=GatesConfig)
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
+    skills: SkillsConfig = field(default_factory=SkillsConfig)
+    capabilities: CapabilitiesConfig = field(default_factory=CapabilitiesConfig)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -499,6 +553,8 @@ class AgentOverrides:
     limits: dict[str, object] = field(default_factory=dict)
     models: dict[str, object] = field(default_factory=dict)
     gates: dict[str, object] = field(default_factory=dict)
+    skills: dict[str, object] = field(default_factory=dict)
+    capabilities: dict[str, bool] = field(default_factory=dict)
     features: dict[str, bool] = field(default_factory=dict)
 
 

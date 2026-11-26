@@ -32,6 +32,7 @@ class Recorder:
         self.artifacts: list[Artifact] = []
         self.stage_seconds: dict[str, float] = {}
         self.usage = Usage(0, 0)
+        self.requests = 0
         self.redactions = 0
         self.started = clock.now()
         self._stage_start: dict[str, float] = {}
@@ -53,6 +54,7 @@ class Recorder:
 
     def model_call(self, stage: str, provider: str, model: str, request: ModelRequest, response: ModelResponse) -> None:
         self.models[stage] = f"{provider}/{model}"
+        self.requests += 1
         self.usage = Usage(self.usage.input_tokens + response.usage.input_tokens,
                            self.usage.output_tokens + response.usage.output_tokens)
         self.event("model_call", {
@@ -71,7 +73,8 @@ class Recorder:
     def finish(self, outcome: Outcome) -> None:
         self.event("redactions", {"count": self.redactions}, always=True)
         meta = RunMeta(1, self.run_id, self.agent, self.ticket_key, self.repo, dict(self.models), __version__,
-                       self.config_hash, self.started, self.clock.now(), dict(self.stage_seconds), self.usage, outcome)
+                       self.config_hash, self.started, self.clock.now(), dict(self.stage_seconds), self.usage, outcome,
+                       self.requests)
         try:
             self.writer.put_run(meta, list(self.events), list(self.artifacts))
             self.writer.flush()

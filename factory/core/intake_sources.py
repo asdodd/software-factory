@@ -190,8 +190,7 @@ class IntakeRunner:
             parts.append(f"{withheld} attachment(s) were withheld by policy.")
         text = self.guard.filter_output("\n\n---\n\n".join(parts)).text
         stage = self.cfg.models.stages.intake
-        models = BudgetedModels(self.c.provider, self.c.port("accounting"), self.clock,
-                                self.cfg.limits.max_tokens_per_ticket)
+        models = BudgetedModels.for_config(self.c.provider, self.c.port("accounting"), self.clock, self.cfg)
         context = CallContext("intake", f"email:{msg.thread_id}", "intake", _addr(msg.sender), "intake")
         user = f"Known repos: {', '.join(self.known_repos) or '(none)'}\n\nThread:\n{text}"
         try:

@@ -103,10 +103,13 @@ class SelfImprovement:
         shown = "\n\n".join(f"--- {path}\n{text}" for path, text in files.items())
         user = (f"Metrics:\n{json.dumps(report, sort_keys=True)}\n\nWorst graded runs:\n"
                 f"{json.dumps(worst, sort_keys=True)}\n\nFiles you may edit:\n{shown}")
+        from factory.core import skills
+        chosen = skills.select(self.cfg, "improve", None, False, self.c.loaded.root)
+        extra = skills.render(chosen, skills.capabilities(self.cfg), self.cfg.skills.max_chars_per_stage)
         stage = self.cfg.models.stages.improve
-        models = BudgetedModels(self.c.provider, self.c.port("accounting"), self.clock,
-                                self.cfg.limits.max_tokens_per_ticket)
-        raw = models.complete(stage.provider, stage.model, (Message(Role.SYSTEM, PROMPT), Message(Role.USER, user)),
+        models = BudgetedModels.for_config(self.c.provider, self.c.port("accounting"), self.clock, self.cfg)
+        system = f"{PROMPT}\n\n{extra}" if extra else PROMPT
+        raw = models.complete(stage.provider, stage.model, (Message(Role.SYSTEM, system), Message(Role.USER, user)),
                               CallContext(AGENT, f"improve:{self.clock.now():%Y%m%d}", "improve", "factory",
                                           "factory")).message.content
         try:

@@ -1,6 +1,6 @@
 """Per-run loopback model gateway.
 
-Harnesses (builtin or bring-your-own) get a 127.0.0.1 URL and a per-run token,
+Harnesses (CLI agents) get a 127.0.0.1 URL and a per-run token,
 never upstream credentials. Requests are translated to the neutral
 ModelRequest and sent through BudgetedModels, so budgets, attribution,
 accounting, and trace capture apply to every harness. The stage's configured
@@ -19,7 +19,7 @@ import threading
 from collections.abc import Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from factory.ports.errors import BudgetExceeded
+from factory.ports.errors import BudgetExceeded, RateLimited
 from factory.ports.types import CallContext, Message, ModelResponse, Role, ToolCall, ToolSpec
 
 log = logging.getLogger("factory.gateway")
@@ -247,6 +247,9 @@ class Gateway:
                     return self._send(404, {"error": {"message": f"unsupported endpoint {path}"}})
                 try:
                     resp = gateway.complete(messages, tools, max_tokens)
+                except RateLimited as exc:
+                    err = {"type": "rate_limit_error", "message": f"request budget: {exc}"}
+                    return self._send(429, {"error": err} if dialect == "openai_chat" else {"type": "error", "error": err})
                 except BudgetExceeded as exc:
                     gateway.budget_exceeded = str(exc)
                     err = {"type": "rate_limit_error", "message": f"budget exceeded: {exc}"}

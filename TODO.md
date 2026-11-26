@@ -23,6 +23,31 @@ Each of these has a working default today; it's a config change or a small code 
   - self-improvement may edit only `factory/skills/**` and `config/agents/**`;
   - the §8.3 limits and polling defaults.
 
+## Stage skills (HumanLayer and Matt Pocock)
+
+- [ ] **Confirm the skill selection matches your original note.** That note wasn't available in this session, so I chose from the public repos: Matt's engineering skills plus HumanLayer's Research-Plan-Implement skills. Adjust `[skills.stages]` or add packs with `skills.extra_paths`.
+- [ ] **Give the spec stage repository access.** It's a single model call today, so HumanLayer's research skills can only run in the implement stage (after spec approval). Running spec through a harness would let research-questions, research and design-discussion run before the plan, as the RPI workflow intends.
+- [ ] **Decide whether to map the unused skills:** `humanlayer-rpi/create-research-questions`, and Matt's `software-factory` vocabulary for design discussions.
+- [ ] **Refresh the vendored copies** from upstream periodically: re-copy from a new commit and update `factory/skills/vendor/SOURCES.toml`. Never edit them in place.
+- [ ] **Check token cost** of the inline skills per stage (`skills.max_chars_per_stage`, default 60k characters) against your model budget.
+
+## Agents, capabilities and request budget
+
+- [ ] **Set `[capabilities]`** for your environment. Defaults: `subagents = false`, `internet = false`. Override per agent if one environment differs.
+- [ ] **Set the pacing to match the endpoint:** `models.budgets.min_request_interval_seconds = 40` (one request every 40 seconds), or `requests_per_hour`. Tune `limits.max_requests_per_ticket` (the runaway guard) after a week of `factory metrics`.
+- [ ] **Check how the endpoint signals back-off.** If it holds the connection open rather than answering 429/503, keep the one-hour model timeout (`timeout_seconds = 3600` in the prod profile). If it answers 429 with `Retry-After`, the provider already waits it out.
+- [ ] **Plan throughput.** At one request every 40 seconds, the whole factory gets about 90 requests an hour. Watch requests per ticket and queue depth before adding agents or turning on triage, grading or self-improvement, which also spend requests.
+- [ ] **Verify native delivery on the box:**
+  - Claude Code reads `~/.claude/CLAUDE.md` and `~/.claude/skills`;
+  - Codex reads `~/.codex/AGENTS.md` and `~/.codex/skills`;
+  - Cline reads `~/Documents/Cline/Rules/`.
+
+  The sandbox sets `HOME` to the run's workspace root. Paths can be adjusted in `factory/core/harness/cli_agents.py` if a version differs.
+- [ ] **Confirm `jam claude` passes `API_TIMEOUT_MS` and the other environment variables through to Claude Code** (it's the default harness).
+- [ ] **Confirm the sub-agent tool name** in your Claude Code version is `Task`, used for `--disallowedTools Task` when sub-agents are off. Codex and Cline have no equivalent flag, so for them the written rule is the brake.
+- [ ] **Consider Claude Code hooks** (a PreToolUse hook calling a factory guard check) to restore per-tool-call auditing of restricted paths. The builtin harness that did this was removed; isolation plus the diff gates remain the enforcement.
+- [ ] **Decide the default delivery.** `skills.delivery = "native"` follows each agent's own mechanisms but costs one skill-loading turn per run. `"inline"` saves that request.
+
 ## To go live
 
 See [design/GO_LIVE.md](design/GO_LIVE.md) for the exact keys.

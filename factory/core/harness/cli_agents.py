@@ -35,6 +35,7 @@ MAX_ARG_PROMPT = 100_000
 
 FOOTER = (
     "\n\n## Reporting\nWork only inside the current directory. Do not commit, push, or contact any service. "
+    "Requests are limited: batch independent tool calls and do not start sub-agents unless your rules allow it. "
     "When you are done, end your final message with exactly one line of JSON: "
     '{"status": "done" | "needs_info" | "blocked" | "failed", "summary": "<one paragraph>", '
     '"questions": ["<numbered questions when status is needs_info>"]}\n'
@@ -63,6 +64,7 @@ PRESETS: dict[str, Preset] = {
             "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
             "DISABLE_AUTOUPDATER": "1",
             "DISABLE_TELEMETRY": "1",
+            "API_TIMEOUT_MS": "3600000",
         },
         dialect="anthropic_messages",
         prompt_via="stdin",
@@ -77,6 +79,8 @@ PRESETS: dict[str, Preset] = {
               "-c", 'model_providers.factory.base_url="{gateway_url}/v1"',
               "-c", 'model_providers.factory.env_key="FACTORY_GATEWAY_TOKEN"',
               "-c", 'model_providers.factory.wire_api="chat"',
+              "-c", "model_providers.factory.stream_idle_timeout_ms=3600000",
+              "-c", "model_providers.factory.request_max_retries=10",
               "--output-last-message", "{output_file}", "-"),
         env={"FACTORY_GATEWAY_TOKEN": "{gateway_token}", "OPENAI_BASE_URL": "{gateway_url}/v1",
              "OPENAI_API_KEY": "{gateway_token}"},
@@ -144,12 +148,30 @@ class CliAgentHarness:
         )
 
     @property
+    def native_skill_dirs(self) -> tuple[str, ...]:
+        """Where this CLI loads skills from, relative to its home (the sandbox root)."""
+        return {"claude": (".claude/skills",), "codex": (".codex/skills",)}.get(self.agent, ())
+
+    @property
+    def native_memory_file(self) -> str:
+        """The global instructions file this CLI reads at start, relative to its home."""
+        return {"claude": ".claude/CLAUDE.md", "codex": ".codex/AGENTS.md",
+                "cline": "Documents/Cline/Rules/software-factory.md"}.get(self.agent, "")
+
+    def capability_args(self, capabilities: Mapping[str, bool]) -> tuple[str, ...]:
+        """Mechanical brakes where the CLI offers them, on top of the written rules."""
+        if self.agent == "claude" and not capabilities.get("subagents", False):
+            return ("--disallowedTools", "Task")
+        return ()
+
+    @property
     def dialect(self) -> str:
         return self.preset.dialect
 
-    def argv(self, values: Mapping[str, str]) -> tuple[str, ...]:
+    def argv(self, values: Mapping[str, str], capabilities: Mapping[str, bool] | None = None) -> tuple[str, ...]:
         head = [self.jam_executable, self.jam_name] if self.launcher == "jam" else [self.executable]
-        return tuple(_fill(a, values) for a in (*head, *self.args, *self.extra_args))
+        extra = self.capability_args(capabilities or {})
+        return tuple(_fill(a, values) for a in (*head, *self.args, *extra, *self.extra_args))
 
     def run(self, task: HarnessTask, runtime: HarnessRuntime) -> HarnessResult:
         if self.dialect not in task.endpoint.dialects:
@@ -169,7 +191,7 @@ class CliAgentHarness:
             "gateway_token": task.endpoint.token, "model": task.endpoint.model, "max_turns": str(task.max_turns),
             "prompt_file": str(prompt_file), "output_file": str(output_file), "prompt": arg_prompt,
         }
-        command = Command(self.argv(values), ".", {k: _fill(v, values) for k, v in self.env.items()},
+        command = Command(self.argv(values, task.capabilities), ".", {k: _fill(v, values) for k, v in self.env.items()},
                           task.timeout_seconds, str(prompt_file) if self.preset.prompt_via == "stdin" else "")
         result = runtime.run(command)
         if result.timed_out:

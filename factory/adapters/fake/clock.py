@@ -18,6 +18,10 @@ class FakeClock:
     def now(self) -> datetime:
         return self._now
 
+    def sleep(self, seconds: float) -> None:
+        self.slept = getattr(self, "slept", 0.0) + max(0.0, seconds)
+        self._now += timedelta(seconds=max(0.0, seconds))
+
     def advance(self, **delta: float) -> None:
         self._now += timedelta(**delta)
 

@@ -58,6 +58,22 @@ class SqliteAccounting:
         with self._lock:
             return int(self._db().execute(sql, args).fetchone()[0])
 
+    def last_request_at(self) -> datetime | None:
+        with self._lock:
+            row = self._db().execute("SELECT MAX(at) FROM spend").fetchone()
+        return datetime.fromisoformat(row[0]) if row and row[0] else None
+
+    def request_count(self, scope: SpendScope | None = None, since: datetime | None = None) -> int:
+        sql, args = "SELECT COUNT(*) FROM spend WHERE 1 = 1", []
+        if scope is not None:
+            sql += f" AND {COLUMNS[scope.kind]} = ?"  # noqa: S608 - column from a fixed map
+            args.append(scope.id)
+        if since is not None:
+            sql += " AND at >= ?"
+            args.append(since.isoformat())
+        with self._lock:
+            return int(self._db().execute(sql, args).fetchone()[0])
+
     def check(self, context: CallContext, estimated_tokens: int) -> BudgetDecision:
         since = self.clock.now() - timedelta(days=1)
         ids = {SpendScopeKind.USER: context.attributed_to, SpendScopeKind.TEAM: context.team,

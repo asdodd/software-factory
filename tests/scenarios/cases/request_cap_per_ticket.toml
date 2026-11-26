@@ -1,0 +1,14 @@
+name = "a ticket that uses up its model-request cap fails with a summary"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+[settings.limits]
+max_requests_per_ticket = 1
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["failed"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-failed"]
+comments_contain = ["reached its cap of 1 model requests"]

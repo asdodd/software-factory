@@ -68,8 +68,7 @@ class Grader:
         self.state = container.port("state_store")
         self.store = container.trace_store()
         self.stage = self.cfg.models.stages.grading
-        self.models = BudgetedModels(container.provider, container.port("accounting"), self.clock,
-                                     self.cfg.limits.max_tokens_per_ticket)
+        self.models = BudgetedModels.for_config(container.provider, container.port("accounting"), self.clock, self.cfg)
 
     @property
     def model_id(self) -> str:

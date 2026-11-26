@@ -1,0 +1,17 @@
+name = "paced requests: a request-limited endpoint slows the ticket down but never fails it"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+[settings.models.budgets]
+min_request_interval_seconds = 40
+requests_per_hour = 1
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+labels_exclude = ["ai-failed"]
+[expect.trace]
+includes = ["request_pacing", "waited_seconds"]

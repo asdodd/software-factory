@@ -1,0 +1,4 @@
+# Factory sidecar: reference files that need capabilities the deployment may lack.
+# HTML-REPORT.md loads Tailwind and Mermaid from public CDNs.
+[files."HTML-REPORT.md"]
+requires = ["internet"]

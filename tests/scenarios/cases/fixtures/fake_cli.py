@@ -73,6 +73,44 @@ else:
     sys.exit(f"unknown fake tool {tool}")
 
 need("## Reporting" in prompt, "prompt lacks the reporting footer")
+home = os.path.expanduser("~")
+
+
+def read(path):
+    if not os.path.isfile(path):
+        return ""
+    with open(path) as fh:
+        return fh.read()
+
+
+if os.environ.get("EXPECT_RULES_FILE"):
+    rules_path = os.path.join(home, os.environ["EXPECT_RULES_FILE"])
+    rules = read(rules_path)
+    need(bool(rules), f"rules file ~/{os.environ['EXPECT_RULES_FILE']} missing")
+    need("Base skill: no proprietary files" in rules, "rules file lacks the base skills")
+    want = os.environ.get("EXPECT_RULES_TEXT", "")
+    need(not want or want in rules, f"rules file lacks {want!r}")
+    avoid = os.environ.get("EXPECT_RULES_NOT", "")
+    need(not avoid or avoid not in rules, f"rules file contains {avoid!r}")
+if os.environ.get("EXPECT_SKILL"):
+    skill = os.environ["EXPECT_SKILL"]
+    for skill_dir in filter(None, os.environ.get("EXPECT_SKILL_DIRS", "").split(",")):
+        need(os.path.isfile(os.path.join(home, skill_dir, skill, "SKILL.md")), f"skill {skill} not under ~/{skill_dir}")
+        installed = read(os.path.join(home, skill_dir, skill, "SKILL.md"))
+        need("factory:if" not in installed, "installed skill still has unrendered factory:if blocks")
+        need("disable-model-invocation" not in installed, "installed skill still disables model invocation")
+    if os.environ.get("EXPECT_SKILL_DIRS"):
+        need(f"`{skill}`" in prompt and "Load all of them together" in prompt, "prompt does not name the skills to load")
+    else:
+        need(f"### Skill `mattpocock/{skill}`" in prompt, "prompt lacks the inline skill")
+    need("/.factory/artifacts" in prompt, "prompt does not name the working-notes directory")
+if os.environ.get("EXPECT_NO_SUBAGENT_FLAG") and tool == "claude":
+    need("--disallowedTools" in args and args[args.index("--disallowedTools") + 1] == "Task", "Task tool not disabled")
+if os.environ.get("EXPECT_LONG_TIMEOUT") and tool == "claude":
+    need(int(os.environ.get("API_TIMEOUT_MS", "0")) >= 3600000, "Claude Code request timeout too short for paced requests")
+if os.environ.get("EXPECT_SUBAGENT_FLAG_ABSENT") and tool == "claude":
+    need("--disallowedTools" not in args, "Task tool disabled although sub-agents are allowed")
+
 edit = json.loads(text)
 if "path" in edit:
     with open(edit["path"], "w") as fh:

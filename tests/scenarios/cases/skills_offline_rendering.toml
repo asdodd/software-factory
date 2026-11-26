@@ -1,0 +1,35 @@
+name = "offline and single-session: rewritten skill passages replace sub-agent and online ones"
+include = ["_common.toml", "_ticket.toml"]
+
+[[model]]
+stage = "triage"
+ticket = "SIM-1"
+content = { difficulty = "hard", reason = "needs a plan" }
+[[model]]
+stage = "spec"
+ticket = "SIM-1"
+content = "PRODUCT-SPEC: multiply."
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "ok" } },
+]
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+set_labels = { ticket = "SIM-1", add = ["ai-spec-approved"] }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["spec_review", "mr_opened"]
+[expect.harness_observed]
+instructions_contain = ["Research the areas yourself, in this session", "Implement the Phase Yourself", "Do not spawn sub-agents", "There is no internet access", "do not create web permalinks"]
+instructions_exclude = ["Spawn parallel sub-agent tasks", "subagent_type=implementer-agent", "gh repo view", "factory:if", "Modified by software-factory"]
+[expect.model_requests.scripted]
+contain = ["### 4. Review both axes yourself, one after the other"]
+exclude = ["### 4. Spawn both sub-agents in parallel"]

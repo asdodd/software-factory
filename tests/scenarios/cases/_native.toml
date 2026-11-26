@@ -1,0 +1,10 @@
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+process_env = { PATH = "{scenario_dir}/fixtures/bin:{PATH}" }
+
+[[model]]
+stage = "implement"
+content = { path = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" }
+
+[[steps]]
+run = "secure-bot"

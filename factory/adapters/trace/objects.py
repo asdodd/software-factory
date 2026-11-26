@@ -56,7 +56,7 @@ def meta_from_dict(d: Mapping) -> RunMeta:
         started=datetime.fromisoformat(d["started"]),
         finished=datetime.fromisoformat(d["finished"]) if d.get("finished") else None,
         stage_seconds=d["stage_seconds"], usage=Usage(**d["usage"]),
-        outcome=Outcome(d["outcome"]) if d.get("outcome") else None,
+        outcome=Outcome(d["outcome"]) if d.get("outcome") else None, requests=int(d.get("requests", 0)),
     )
 
 

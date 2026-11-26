@@ -2,6 +2,8 @@
 state store. Deterministic: no model.
 
 - cost per ticket: tokens per ticket over the period
+- requests per ticket: model requests per ticket (the scarce resource when the
+  endpoint is request-limited)
 - MR acceptance rate: merged / (merged + closed) from recorded MR outcomes
 - review rounds: fix rounds per closed-out MR
 - human override rate at intake: overrides / (overrides + confirmations)
@@ -22,6 +24,7 @@ FAILED_TOOL = ("denied:", "error:", "exit 1", "exit 2", "exit 127")
 
 def compute(reader, state, since: datetime, until: datetime, agent: str | None = None) -> dict:
     tokens_by_ticket: dict[str, int] = defaultdict(int)
+    requests_by_ticket: dict[str, int] = defaultdict(int)
     stage_times: dict[str, list[float]] = defaultdict(list)
     outcomes: dict[str, int] = defaultdict(int)
     merged = closed = 0
@@ -31,6 +34,7 @@ def compute(reader, state, since: datetime, until: datetime, agent: str | None =
     for meta in reader.list(TraceQuery(agent=agent, since=since, until=until)):
         runs += 1
         tokens_by_ticket[meta.ticket_key] += meta.usage.total
+        requests_by_ticket[meta.ticket_key] += meta.requests
         for stage, seconds in meta.stage_seconds.items():
             stage_times[stage].append(seconds)
         if meta.outcome:
@@ -59,6 +63,8 @@ def compute(reader, state, since: datetime, until: datetime, agent: str | None =
         "outcomes": dict(outcomes),
         "tickets": len(tokens_by_ticket),
         "cost_per_ticket_tokens": round(mean(tokens_by_ticket.values()), 1) if tokens_by_ticket else None,
+        "requests_per_ticket": round(mean(requests_by_ticket.values()), 1) if requests_by_ticket else None,
+        "requests_total": sum(requests_by_ticket.values()),
         "mr_acceptance_rate": round(merged / (merged + closed), 3) if merged + closed else None,
         "review_rounds_mean": round(mean(fix_rounds), 2) if fix_rounds else None,
         "intake_override_rate": round(overrides / (overrides + confirmations), 3) if overrides + confirmations else None,
@@ -77,6 +83,7 @@ def prometheus(report: dict, prefix: str = "factory") -> str:
 
     gauge("runs", report["runs"])
     gauge("cost_per_ticket_tokens", report["cost_per_ticket_tokens"])
+    gauge("requests_per_ticket", report.get("requests_per_ticket"))
     gauge("mr_acceptance_rate", report["mr_acceptance_rate"])
     gauge("review_rounds_mean", report["review_rounds_mean"])
     gauge("intake_override_rate", report["intake_override_rate"])

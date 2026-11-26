@@ -26,6 +26,8 @@ grades = 1
 grades_calibrated = true
 proposal_opened = true
 proposal_files = ["factory/skills/base/shared_process.md"]
+[expect.model_requests.scripted]
+contain = ["### Skill `mattpocock/retro`", "### Skill `mattpocock/improve-codebase-architecture`"]
 [expect.git]
 mrs = 2
 pushed_branches = ["ai/self-improvement/20260105"]

@@ -32,9 +32,9 @@ log = logging.getLogger("factory.writes")
 
 MINIMAL = {"claimed", "spec_posted", "needs_info", "blocked", "failed", "bounced", "finished", "stalled"}
 MILESTONES = MINIMAL | {"triaged", "implementation_started", "branch_pushed", "mr_opened", "review_done",
-                        "verification_done", "reclaimed", "resumed", "mr_feedback", "email_update"}
+                        "verification_done", "reclaimed", "resumed", "mr_feedback", "email_update", "deferred"}
 STANDALONE = {"needs_info", "bounced", "blocked", "failed", "finished", "spec_posted", "stalled", "reclaimed",
-              "resumed", "mr_feedback", "email_update"}
+              "resumed", "mr_feedback", "email_update", "deferred"}
 
 
 @dataclass

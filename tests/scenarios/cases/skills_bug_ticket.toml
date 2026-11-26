@@ -1,0 +1,29 @@
+name = "bug tickets also get the diagnosing-bugs skill; spec-only skills stay out without a spec"
+include = ["_common.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "add() returns the wrong sign"
+status = "Ready for AI"
+issue_type = "Bug"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- add(-1, -2) == -3"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Fixed." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+instructions_contain = ["### Skill `mattpocock/tdd`", "### Skill `mattpocock/diagnosing-bugs`"]

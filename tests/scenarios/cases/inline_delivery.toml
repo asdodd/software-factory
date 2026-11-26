@@ -1,0 +1,19 @@
+name = "skills.delivery = inline puts the rendered skills in the prompt instead of skill folders"
+include = ["_native.toml"]
+
+[settings.skills]
+delivery = "inline"
+
+[settings.harnesses.claude.settings]
+agent = "claude"
+env = { EXPECT_SKILL = "tdd", EXPECT_SKILL_DIRS = "" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "claude"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+mr_description_contains = ["ISOLATION-OK via claude"]

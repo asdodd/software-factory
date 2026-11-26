@@ -27,7 +27,6 @@ MODEL_STAGES = {
 ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source",
                 "notifier")
 FEATURE_PORTS = {"mailbox": ("intake.email",), "monitor": ("intake.monitoring", "monitoring")}
-TOOL_LOOP_HARNESSES = frozenset({"harness.builtin"})
 
 
 def effective_rule(config: FactoryConfig, channel: str) -> CommenterRule:
@@ -142,7 +141,7 @@ def _check_harness(prefix: str, name: str, cfg: FactoryConfig, out: list) -> Non
     if needed and needed not in cfg.gateway.dialects:
         out.append(Diagnostic("error", f"{prefix}harness {name!r} needs gateway dialect {needed}; "
                                        "add it to gateway.dialects"))
-    if cfg.access_policy.mode == "deny_read" and h.adapter not in TOOL_LOOP_HARNESSES and not _sandbox_hides_paths(cfg):
+    if cfg.access_policy.mode == "deny_read" and not _sandbox_hides_paths(cfg):
         out.append(Diagnostic(
             "error",
             f"{prefix}access_policy.mode = deny_read cannot be enforced for harness {name!r}; "
@@ -213,6 +212,10 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
         if ts.s3.encryption.mode == "sse-kms" and not ts.s3.encryption.kms_key_id:
             out.append(Diagnostic("error", "trace_store.s3.encryption.kms_key_id is required for sse-kms"))
 
+    from factory.core.skills import unknown as unknown_skills
+    for label, conf in [("", cfg), *((f"agent {n}: ", loaded.agent_configs[n]) for n in loaded.enabled_agents())]:
+        for sid in unknown_skills(conf, loaded.root):
+            out.append(Diagnostic("error", f"{label}skills: unknown skill {sid!r} (not vendored and not in skills.extra_paths)"))
     if loaded.features.on("feedback.self_improvement") and not cfg.feedback.self_improvement.repo:
         out.append(Diagnostic("error", "feedback.self_improvement.repo is required when self-improvement is on"))
     if not cfg.access_policy.enabled:

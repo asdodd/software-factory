@@ -12,6 +12,14 @@ class Accounting(Protocol):
 
     def spent_tokens(self, scope: SpendScope, since: datetime | None = None) -> int: ...
 
+    def last_request_at(self) -> datetime | None:
+        """When the most recent model request (any scope) was recorded."""
+        ...
+
+    def request_count(self, scope: SpendScope | None = None, since: datetime | None = None) -> int:
+        """Model requests recorded in scope (None: all scopes) since a time."""
+        ...
+
     def check(self, context: CallContext, estimated_tokens: int) -> BudgetDecision:
         """Checks ticket, user, team, and agent budgets; first exhausted scope wins."""
         ...

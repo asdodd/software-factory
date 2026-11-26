@@ -1,0 +1,16 @@
+name = "codex gets the factory rules and skills its own way, with sub-agents and internet off"
+include = ["_native.toml"]
+
+[settings.harnesses.codex.settings]
+agent = "codex"
+env = { EXPECT_RULES_FILE = ".codex/AGENTS.md", EXPECT_RULES_TEXT = "Do not spawn sub-agents", EXPECT_SKILL = "tdd", EXPECT_SKILL_DIRS = ".codex/skills", EXPECT_NO_SUBAGENT_FLAG = "1" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "codex"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+mr_description_contains = ["ISOLATION-OK via codex"]

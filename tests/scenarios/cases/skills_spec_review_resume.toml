@@ -1,0 +1,33 @@
+name = "spec, review, and post-approval implement stages each get their skills"
+include = ["_common.toml", "_ticket.toml"]
+
+[[model]]
+stage = "triage"
+ticket = "SIM-1"
+content = { difficulty = "hard", reason = "needs a plan" }
+[[model]]
+stage = "spec"
+ticket = "SIM-1"
+content = "PRODUCT-SPEC: multiply.\nTECH-SPEC: add multiply() to calc.py in one phase."
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Implemented the plan." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+set_labels = { ticket = "SIM-1", add = ["ai-spec-approved"] }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["spec_review", "mr_opened"]
+[expect.model_requests.scripted]
+contain = ["### Skill `mattpocock/to-spec`", "### Skill `humanlayer-rpi/create-plan`", "### Skill `mattpocock/codebase-design`", "### Skill `mattpocock/code-review`", "### Skill `mattpocock/pr`", "Approved spec:\nPRODUCT-SPEC"]
+[expect.harness_observed]
+instructions_contain = ["### Skill `humanlayer-rpi/implement-plan`", "### Skill `humanlayer-rpi/create-research`", "### Skill `mattpocock/tdd`", "## Approved spec"]

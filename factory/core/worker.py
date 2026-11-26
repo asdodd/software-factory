@@ -19,7 +19,7 @@ from pathlib import Path
 
 from factory.config.schema import RepoRules
 from factory.config.validate import ConfigError, build
-from factory.core import architecture, gates, instructions, quality, readiness, workspace
+from factory.core import architecture, gates, instructions, quality, readiness, skills, workspace
 from factory.core.budget import BudgetedModels
 from factory.core.claim import Claimer
 from factory.core.container import Container
@@ -27,7 +27,7 @@ from factory.core.gateway import Gateway
 from factory.core.recorder import Recorder
 from factory.core.stateindex import Index, Records
 from factory.core.writes import Note, Writes
-from factory.ports.errors import BudgetExceeded, NotFound, SubmoduleFailure
+from factory.ports.errors import BudgetExceeded, NotFound, RateLimited, SubmoduleFailure
 from factory.ports.types import (
     Artifact,
     CallContext,
@@ -177,13 +177,17 @@ class Worker:
                             ticket_key=ticket.key, config_hash=self.config_hash)
         recorder.repo = readiness.text_field(ticket, "repo")
         recorder.event("run", {"mode": mode}, always=True)
-        models = BudgetedModels(self.c.provider, self.accounting, self.clock, self.cfg.limits.max_tokens_per_ticket,
-                                recorder)
+        holder: list[_Run] = []
+        models = BudgetedModels.for_config(self.c.provider, self.accounting, self.clock, self.cfg, recorder,
+                                           on_request=lambda: holder[0].heartbeat() if holder else None)
         run = _Run(self, ticket, mode, run_id, recorder, models, answers, rounds, fix)
+        holder.append(run)
         try:
             report = run.execute_fix() if fix else run.execute()
         except Stop as stop:
             report = RunReport(ticket.key, stop.outcome, stop.detail, run_id)
+        except RateLimited as exc:
+            report = run.defer(str(exc))
         except BudgetExceeded as exc:
             report = run.fail(f"Spend cap reached: {exc}")
         except Exception as exc:  # noqa: BLE001 - any failure ends in a failed ticket, never a crash loop
@@ -191,6 +195,8 @@ class Worker:
             report = run.fail(f"Internal error ({type(exc).__name__}). See the trace for run {run_id}.")
         finally:
             run.cleanup()
+        if models.waited_seconds:
+            recorder.event("request_pacing", {"waited_seconds": round(models.waited_seconds, 1)}, always=True)
         recorder.event("outcome", {"outcome": report.outcome.value, "detail": report.detail}, always=True)
         recorder.finish(report.outcome)
         self.metrics.incr("runs", outcome=report.outcome.value, agent=self.name)
@@ -222,6 +228,8 @@ class _Run:
         self.evidence: list[Artifact] = []
         self.check_logs: list[str] = []
         self.quality_flags: list[str] = []
+        self.leased = fix is None
+        self.last_renewal = worker.clock.now()
 
     # ---- helpers -----------------------------------------------------------
     def say(self, milestone: str, note: Note) -> str | None:
@@ -237,12 +245,31 @@ class _Run:
         return resp.message.content
 
     def release(self) -> None:
+        self.leased = False
         self.w.claimer.release(self.key)
+
+    def stage_skills(self, stage: str, has_spec: bool):
+        """Skills for a model-only stage (spec, review), rendered inline."""
+        chosen = skills.select(self.cfg, stage, self.ticket, has_spec, self.w.c.loaded.root)
+        if chosen:
+            self.rec.event("skills", {"stage": stage, "skills": [s.id for s in chosen]}, always=True)
+        return chosen, skills.render(chosen, skills.capabilities(self.cfg), self.cfg.skills.max_chars_per_stage)
 
     def renew(self) -> None:
         if self.fix is None and not self.w.dry_run:
-            expires = self.w.clock.now() + timedelta(minutes=self.cfg.limits.lease_minutes)
+            now = self.w.clock.now()
+            expires = now + timedelta(minutes=self.cfg.limits.lease_minutes)
             self.w.writes.update(self.key, {"lease_owner": self.w.worker_id, "lease_expires": expires.isoformat()})
+            self.last_renewal = now
+
+    def heartbeat(self) -> None:
+        """Called on every model request and pacing step: keep the lease alive through slow,
+        paced runs, renewing at most every third of the lease period."""
+        if not self.leased:
+            return
+        last = getattr(self, "last_renewal", None)
+        if last is None or (self.w.clock.now() - last) >= timedelta(minutes=self.cfg.limits.lease_minutes / 3):
+            self.renew()
 
     def labels(self, add=(), remove=()) -> None:
         self.w.writes.set_labels(self.key, add, remove)
@@ -261,6 +288,15 @@ class _Run:
                                 next="A human should review the ticket and the trace before retrying."))
         self.w.notify(NotificationKind.TICKET_FAILED, self.ticket, f"{self.key} failed: {summary[:200]}")
         return RunReport(self.key, Outcome.FAILED, summary, self.run_id)
+
+    def defer(self, why: str) -> RunReport:
+        """The hourly request budget is used up: give the ticket back for a later cycle."""
+        if self.fix is None:
+            self.w.writes.transition(self.key, LogicalStatus.READY)
+            self.release()
+            self.say("deferred", Note("Deferred", "ready", done=f"Paused: {why}.",
+                                      next="The factory will pick this up again when the request budget allows."))
+        return RunReport(self.key, Outcome.DEFERRED, why, self.run_id)
 
     def blocked(self, summary: str, paths: list[str] | None = None) -> Stop:
         detail = summary + ("\nPaths: " + ", ".join(sorted(paths)) if paths else "")
@@ -357,7 +393,7 @@ class _Run:
         try:
             found, stats, summary, report, copy = self.implement(
                 self.w.state.get("spec", self.key) or "", 0, "", "fix-attempts", f"{f.mr_id}:{f.comment_id}",
-                produce, feedback)
+                produce, feedback, with_skills=not f.apply)
         except GaveUp as exc:
             self.reply(f"I could not produce a change that passes the gates: {exc}", "gave-up")
             return RunReport(self.key, Outcome.FIX_FAILED, str(exc), self.run_id)
@@ -403,8 +439,9 @@ class _Run:
         if not hard or not self.w.features.on("spec"):
             return ""
         self.rec.stage("spec")
-        spec = self.ask_model("spec", "Write a product spec (what) and a tech spec (how) in markdown.",
-                              self.ticket_text())
+        _, spec_skills = self.stage_skills("spec", has_spec=False)
+        system = "Write a product spec (what) and a tech spec (how) in markdown."
+        spec = self.ask_model("spec", f"{system}\n\n{spec_skills}" if spec_skills else system, self.ticket_text())
         self.rec.stage_done("spec")
         spec = self.guard.filter_output(spec).text
         self.w.state.put("spec", self.key, spec)
@@ -477,7 +514,7 @@ class _Run:
     # ---- the implement-and-gate loop -----------------------------------------
     def implement(self, spec: str, withheld: int, attach_dir: str, attempts_ns: str, attempts_key: str,
                   produce: Callable[[Path, Path, Path, SandboxRuntime], HarnessResult],
-                  feedback: list[str] | None = None):
+                  feedback: list[str] | None = None, with_skills: bool = True):
         copy = self.ws.root / "work"
         workspace.isolate(self.clone_root, copy)
         self.guard.scan_workspace(copy)
@@ -493,6 +530,7 @@ class _Run:
         feedback = list(feedback or [])
         initial = list(feedback)
         answers = tuple(self.guard.filter_output(a).text for a in self.answers)
+        rules_text, skills_text, artifacts = self.prepare_delivery(bool(spec)) if with_skills else (None, "", None)
         while True:
             used = int(self.w.state.get(attempts_ns, attempts_key) or 0)
             if used >= self.cfg.limits.max_attempts:
@@ -506,11 +544,12 @@ class _Run:
             result_file.unlink(missing_ok=True)
             task_file.write_text(instructions.render(self.ticket, self.cfg, self.rules, standards, spec, feedback,
                                                      withheld, str(self.ws.root / attach_dir) if attach_dir else "",
-                                                     answers))
+                                                     answers, skills_text, rules_text))
             denials_before = len(self.guard.denials)
             self.rec.stage("implement")
             result = produce(copy, task_file, result_file, runtime)
             self.rec.stage_done("implement")
+            self.collect_artifacts(artifacts)
             denied = self.guard.denials[denials_before:]
             for d in denied:
                 self.rec.event("access_denied", {"kind": d.kind, "reason": d.reason}, always=True)
@@ -537,6 +576,46 @@ class _Run:
             self.w.state.delete(attempts_ns, attempts_key)
             return found, stats, result.summary, report, copy
 
+    def prepare_delivery(self, has_spec: bool) -> tuple[str | None, str, Path | None]:
+        """Rules and implement-stage skills for the CLI agent, delivered its own way.
+
+        Returns (rules for the prompt, skills section for the prompt, working-notes dir).
+        In native mode the rules also go to the agent's global memory file and the
+        skills to its skills folder, both in the sandbox home (outside the repository
+        copy); the prompt then names the skills to load. Agents without those
+        mechanisms, and inline mode, get everything in the prompt."""
+        caps = skills.capabilities(self.cfg)
+        stage = self.cfg.models.stages.implement
+        harness = self.w.c.harness(stage.harness)
+        scripted = self.cfg.harnesses[stage.harness].adapter == "harness.scripted"
+        artifacts = None if scripted else self.ws.root / ".factory" / "artifacts"
+        if artifacts is not None:
+            artifacts.mkdir(parents=True, exist_ok=True)
+        notes = str(artifacts) if artifacts else ""
+        native = self.cfg.skills.delivery == "native"
+        rules = skills.base_rules(caps)
+        memory = getattr(harness, "native_memory_file", "")
+        if native and memory:
+            skills.install_rules(rules, self.ws.root, memory)
+        chosen = skills.select(self.cfg, "implement", self.ticket, has_spec, self.w.c.loaded.root)
+        if chosen:
+            self.rec.event("skills", {"stage": "implement", "skills": [s.id for s in chosen],
+                                      "delivery": self.cfg.skills.delivery}, always=True)
+        dirs = tuple(getattr(harness, "native_skill_dirs", ()))
+        if chosen and native and dirs:
+            installed = skills.install(chosen, caps, self.ws.root, dirs)
+            text = skills.pointer(chosen, caps, notes, installed)
+        else:
+            text = skills.render(chosen, caps, self.cfg.skills.max_chars_per_stage, notes)
+        return rules, text, artifacts
+
+    def collect_artifacts(self, artifacts: Path | None) -> None:
+        if artifacts is None or not artifacts.is_dir():
+            return
+        for path in sorted(artifacts.rglob("*")):
+            if path.is_file() and not path.is_symlink() and not self.guard.content_matches(path.read_bytes()):
+                self.rec.artifact(Artifact(f"notes/{path.relative_to(artifacts)}", path, "text/markdown"))
+
     def run_harness(self, copy: Path, task_file: Path, result_file: Path, runtime: SandboxRuntime) -> HarnessResult:
         stage = self.cfg.models.stages.implement
         harness = self.w.c.harness(stage.harness)
@@ -546,7 +625,7 @@ class _Run:
                      tuple(gw_cfg.dialects)) as gw:
             task = HarnessTask(self.run_id, "implement", self.key, Workspace(self.ws.id, copy), task_file, result_file,
                                ModelEndpoint(gw.base_url, gw.token, stage.model, tuple(gw_cfg.dialects)),
-                               float(h_cfg.timeout_minutes * 60), h_cfg.max_turns)
+                               float(h_cfg.timeout_minutes * 60), h_cfg.max_turns, skills.capabilities(self.cfg))
             result = harness.run(task, runtime)
         if gw.budget_exceeded:
             raise BudgetExceeded(gw.budget_exceeded)
@@ -660,13 +739,17 @@ class _Run:
             return {}
         self.rec.stage("review")
         standards = "\n\n".join(text for _, text in self.standards())
+        spec = self.w.state.get("spec", self.key) or ""
+        _, review_skills = self.stage_skills("review", has_spec=bool(spec))
+        system = ("You are reviewing a change you did not write. Check it against the standards and against the "
+                  "ticket (and spec, if any). Reply with JSON "
+                  '{"summary": "...", "blast_radius": "...", "merge_danger": "low"|"medium"|"high", '
+                  '"findings": [{"note": "...", "path": "...", "line_start": n, "line_end": n, "replacement": "..."}], '
+                  '"architecture_diff": "..."}. Give path, lines, and replacement only for concrete suggested changes.')
         raw = self.ask_model(
-            "review",
-            "You are reviewing a change you did not write. Check it against the standards. Reply with JSON "
-            '{"summary": "...", "blast_radius": "...", "merge_danger": "low"|"medium"|"high", '
-            '"findings": [{"note": "...", "path": "...", "line_start": n, "line_end": n, "replacement": "..."}], '
-            '"architecture_diff": "..."}. Give path, lines, and replacement only for concrete suggested changes.',
-            f"Standards:\n{standards}\n\nDiff:\n{diff}")
+            "review", f"{system}\n\n{review_skills}" if review_skills else system,
+            f"Ticket:\n{self.ticket_text()}\n\n" + (f"Approved spec:\n{spec}\n\n" if spec else "")
+            + f"Standards:\n{standards}\n\nDiff:\n{diff}")
         self.rec.stage_done("review")
         try:
             doc = json.loads(raw)

@@ -29,7 +29,6 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "model_provider.scripted" = "factory.adapters.fake.model_provider:ScriptedModelProvider"
 "model_provider.replay"  = "factory.adapters.models.replay:ReplayModelProvider"
 "model_provider.openai_compatible" = "factory.adapters.models.openai_compatible:OpenAICompatibleProvider"
-"harness.builtin"        = "factory.core.harness.builtin:BuiltinHarness"
 "harness.command"        = "factory.core.harness.command:CommandHarness"
 "harness.cli_agent"      = "factory.core.harness.cli_agents:CliAgentHarness"
 "harness.scripted"       = "factory.adapters.fake.harness:ScriptedHarness"
@@ -120,6 +119,8 @@ max_tokens_per_ticket = 2000000
 max_files_changed = 15                   # readiness "bounded scope" and PR gate
 max_diff_lines = 600
 max_denied_access_attempts = 5           # run stops and comments after this many
+max_requests_per_ticket = 400            # runaway guard: a ticket using more model requests than this fails
+                                         # (the endpoint's own limit never fails a ticket; it is paced)
 
 [git]
 executable = "git"
@@ -186,7 +187,7 @@ rules = []                               # [{agent = "docs-bot", components = ["
 # Implementer and reviewer are configured separately; use a different model or
 # provider for review to avoid correlated blind spots.
 # Bring your own harness: `harness` names an entry under [harnesses]. Only stages
-# that drive a tool loop (implement, optionally review) need one.
+# that run an agent (implement) need one.
 [models.stages.triage]
 provider = ""
 model = ""
@@ -196,7 +197,7 @@ model = ""
 [models.stages.implement]
 provider = ""
 model = ""
-harness = "builtin"
+harness = "jam-claude"                   # jam-claude | jam-codex | claude | codex | cline | your own
 [models.stages.review]
 provider = ""
 model = ""
@@ -216,19 +217,22 @@ model = ""
 user_tokens_per_day = 0
 team_tokens_per_day = 0
 agent_tokens_per_day = 0
-requests_per_minute = 0
+# The endpoint backs off instead of failing, so the factory paces requests rather
+# than failing them. Every model request through the factory shares these.
+min_request_interval_seconds = 0         # e.g. 40 to match an endpoint that serves one request every 40s
+requests_per_hour = 0                    # rolling window; 0 = no window
+max_wait_seconds = 0                     # 0 = wait as long as it takes; >0 defers the ticket after that long
 
-# Harnesses. Every harness gets the same thing: an isolated workspace copy
-# (access policy applied, history replaced by one baseline commit), a rendered
-# instructions file (ticket, spec, base skills, global and repo rules), and a
-# loopback model gateway URL with a per-run token. It never gets upstream model
-# credentials, ticket or git-host credentials, or the real clone. The factory
-# diffs the result, runs the PR gates, and pushes.
-[harnesses.builtin]
-adapter = "harness.builtin"               # in-house tool loop; tools go through AccessGuard
-timeout_minutes = 60
-max_turns = 200
-
+# Harnesses: the factory has no tool loop of its own; a CLI agent does the work.
+# Every harness gets an isolated workspace copy (access policy applied, history
+# replaced by one baseline commit), a task prompt (ticket, spec, answers,
+# feedback), and a loopback model gateway URL with a per-run token. The
+# factory's rules and stage skills are delivered the agent's own way (see
+# [skills].delivery): CLAUDE.md / AGENTS.md / Cline rules in the sandbox home,
+# and SKILL.md folders under ~/.claude/skills and ~/.codex/skills. The repo's
+# own AGENTS.md / CLAUDE.md is read from the workspace as usual. A harness never
+# gets upstream model credentials, ticket or git-host credentials, or the real
+# clone. The factory diffs the result, runs the PR gates, and pushes.
 # Known CLI agents: Claude Code, Codex, and Cline, run directly or through jam
 # (`jam claude ...`, `jam codex ...`). Each is pointed at the loopback gateway
 # with a per-run token. Pick one per stage and per agent, e.g.
@@ -285,6 +289,54 @@ base_branch = "main"
 allowed_paths = ["factory/skills/**", "config/agents/**"]
 max_files = 10
 lookback_days = 14
+
+# Stage skills: optional third-party skills rendered after the mandatory base
+# skills (which always win) and the factory adapter preamble. Vendored packs:
+# mattpocock (MIT) and humanlayer-rpi (Apache-2.0), see factory/skills/vendor/SOURCES.toml.
+# Each entry may add issue_types = [...] or requires_spec = true. Agents can
+# override any stage list under [overrides.skills.stages].
+# What the agent environment allows. Base rules, stage skills, and CLI flags are
+# rendered to match: text inside <!-- factory:if subagents --> ... blocks is kept
+# only when allowed. Agents may override under [overrides.capabilities].
+[capabilities]
+subagents = false                        # requests are the scarce resource; sub-agents multiply them
+internet = false                         # skills needing online resources are left out or rewritten
+
+[skills]
+enabled = true
+max_chars_per_stage = 60000
+delivery = "native"                      # native: CLAUDE.md/AGENTS.md + SKILL.md folders in the sandbox home
+                                         # inline: everything in the task prompt (no skill-loading turns)
+extra_paths = []                         # your own packs: <path>/<pack>/<name>/SKILL.md
+
+[[skills.stages.spec]]
+skill = "mattpocock/to-spec"
+[[skills.stages.spec]]
+skill = "humanlayer-rpi/create-plan"
+[[skills.stages.spec]]
+skill = "mattpocock/codebase-design"
+
+[[skills.stages.implement]]
+skill = "humanlayer-rpi/create-research"
+requires_spec = true
+[[skills.stages.implement]]
+skill = "humanlayer-rpi/implement-plan"
+requires_spec = true
+[[skills.stages.implement]]
+skill = "mattpocock/tdd"
+[[skills.stages.implement]]
+skill = "mattpocock/diagnosing-bugs"
+issue_types = ["Bug"]
+
+[[skills.stages.review]]
+skill = "mattpocock/code-review"
+[[skills.stages.review]]
+skill = "mattpocock/pr"
+
+[[skills.stages.improve]]
+skill = "mattpocock/retro"
+[[skills.stages.improve]]
+skill = "mattpocock/improve-codebase-architecture"
 
 # Who is alerted, by user id (the ticket reporter is added when include_reporter is true).
 [notifications]
