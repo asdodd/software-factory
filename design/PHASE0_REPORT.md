@@ -103,6 +103,14 @@ A `features.X` key means key `"X"` in the `[features]` table. Precedence from lo
 
 `intake.routing` is listed here because §6.8 says routing "can be toggled, and default[s] to off". The spec does not say whether `monitoring` depends on `intake.monitoring` or the reverse. I chose "monitors need intake to accept their findings".
 
+## Decisions recorded
+
+- **Deny markings:** `proprietary` only (path and content). No other default patterns.
+- **Dependencies:** third-party packages are allowed, including `boto3` for S3 and `pytest` for tests. Every package is still pinned and listed.
+- **S3:** keep dummy defaults for now. The S3 backend is tested only against the in-process fake.
+- **Languages:** no language is modelled per repo. Each repo's rules file declares its own lint, test, coverage and verify commands, which may span several languages. Gates read standard formats (JUnit XML, LCOV or Cobertura). Fixtures include a mixed-language repo.
+- **Sandbox:** `local_dir`, rooted at a directory set in config, with a fresh subdirectory per run, a scrubbed environment, `resource` limits, process-group kill on timeout, and teardown. A `bubblewrap` or `podman` plugin can be added later as a config-only change.
+
 ## Open questions (§14), with recommendations
 
 1. **Config format.** *Recommendation: TOML.* Python 3.11+ ships `tomllib` in the standard library, so the config needs no dependency on the offline box. YAML would need PyYAML to be approved and mirrored. The cost is that spec §6.10 and §8.3 examples are written in YAML; I translated them one to one. If you prefer YAML and approve PyYAML, only the loader and the example files change.
