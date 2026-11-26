@@ -1,0 +1,46 @@
+name = "a bring-your-own harness never sees restricted files, in the tree or in history"
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+
+[[attachments]]
+ticket = "SIM-1"
+name = "proprietary-design.txt"
+content = "TOPSECRET-ATTACHMENT-NAME"
+[[attachments]]
+ticket = "SIM-1"
+name = "notes.txt"
+content = "PROPRIETARY\nTOPSECRET-ATTACHMENT-CONTENT"
+[[attachments]]
+ticket = "SIM-1"
+name = "spec.txt"
+content = "multiply should accept ints"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "secure-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+files_include = ["src/calc.py", "vendor/keys/util.py"]
+files_exclude = ["proprietary", "vendor_algo.py", "Proprietary-Notes", "link.py", "keys.txt"]
+history_excludes = ["TOPSECRET"]
+instructions_contain = ["2 attachment(s) were withheld by the access policy."]
+[expect.git]
+mrs = 1
+[[expect.git.branch_files]]
+path = "web/secure"
+branch = "ai/secure-bot/SIM-1"
+contains = { "proprietary/algo.py" = "TOPSECRET-ALGO", "src/calc.py" = "def multiply" }
+[[expect.tickets]]
+key = "SIM-1"
+comments_exclude = ["TOPSECRET"]
+[expect.trace]
+excludes = ["TOPSECRET"]

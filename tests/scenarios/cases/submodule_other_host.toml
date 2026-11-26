@@ -1,0 +1,14 @@
+name = "a submodule on another host works through a URL rewrite and a credential"
+include = ["_common.toml", "_other_host.toml"]
+agent_files = ["agents/app-bot.toml"]
+env = { SIM_OTHER_HOST_TOKEN = "sim-token-0123456789" }
+
+[[steps]]
+run = "app-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+files_include = ["vendor/shared/shared.py"]
+[expect.trace]
+excludes = ["sim-token-0123456789"]

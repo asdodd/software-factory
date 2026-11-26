@@ -32,7 +32,10 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "harness.builtin"        = "factory.core.harness.builtin:BuiltinHarness"
 "harness.command"        = "factory.core.harness.command:CommandHarness"
 "harness.scripted"       = "factory.adapters.fake.harness:ScriptedHarness"
-"sandbox.local_dir"      = "factory.adapters.fake.sandbox:LocalDirSandbox"
+"sandbox.local_dir"      = "factory.adapters.sandbox.local_dir:LocalDirSandbox"
+"trace_store.memory"     = "factory.adapters.trace.stores:MemoryTraceStore"
+"trace_store.local_fs"   = "factory.adapters.trace.stores:LocalFsTraceStore"
+"trace_store.s3"         = "factory.adapters.trace.s3:S3TraceStore"
 "access_guard.policy"    = "factory.access.guard:PolicyAccessGuard"
 "notifier.fake"          = "factory.adapters.fake.notifier:FakeNotifier"
 "notifier.ticket_comment" = "factory.core.notify:TicketCommentNotifier"
@@ -115,7 +118,8 @@ max_diff_lines = 600
 max_denied_access_attempts = 5           # run stops and comments after this many
 
 [git]
-executable = "git"                       # fixed argv, explicit timeouts, no shell
+executable = "git"
+default_branch = "main"                  # per repo: [git.branches] "group/repo" = "develop"                       # fixed argv, explicit timeouts, no shell
 url_rewrites = []                        # [{match = "git@host:", replace = "https://host/"}]
 [git.clone]
 depth = 1

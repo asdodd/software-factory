@@ -58,6 +58,7 @@ class WorkflowConfig:
     fields: dict[str, str] = field(default_factory=dict)
     link_types: dict[str, str] = field(default_factory=dict)
     claim_from: list[str] = field(default_factory=lambda: ["ready"])
+    priority_order: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -129,6 +130,8 @@ class LimitsConfig:
     max_files_changed: int = 15
     max_diff_lines: int = 600
     max_denied_access_attempts: int = 5
+    max_ticket_chars: int = 12000
+    max_acceptance_criteria: int = 12
 
 
 @dataclass(frozen=True)
@@ -162,6 +165,8 @@ class HostCredential:
 @dataclass(frozen=True)
 class GitConfig:
     executable: str = "git"
+    default_branch: str = "main"
+    branches: dict[str, str] = field(default_factory=dict)
     clone: GitCloneConfig = field(default_factory=GitCloneConfig)
     submodules: GitSubmodulesConfig = field(default_factory=GitSubmodulesConfig)
     url_rewrites: list[UrlRewrite] = field(default_factory=list)
@@ -347,6 +352,9 @@ class GatesConfig:
     min_changed_line_coverage: float = 0.8
     min_mutation_score: float = 0.6
     protected_paths: list[str] = field(default_factory=list)
+    forbid_new_doc_files: bool = True
+    doc_file_patterns: list[str] = field(default_factory=lambda: ["*.md", "*.rst", "*.adoc", "docs/**"])
+    test_file_patterns: list[str] = field(default_factory=lambda: ["test_*", "*_test.*", "*.test.*", "*.spec.*", "tests/**", "test/**"])
 
 
 @dataclass(frozen=True)
@@ -412,6 +420,7 @@ class AgentOverrides:
     mr: dict[str, object] = field(default_factory=dict)
     limits: dict[str, object] = field(default_factory=dict)
     models: dict[str, object] = field(default_factory=dict)
+    gates: dict[str, object] = field(default_factory=dict)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -426,3 +435,27 @@ class AgentConfig:
     claim: ClaimConfig = field(default_factory=ClaimConfig)
     extra_deny_patterns: list[str] = field(default_factory=list)
     overrides: AgentOverrides = field(default_factory=AgentOverrides)
+
+
+@dataclass(frozen=True)
+class RepoCommands:
+    """Each entry is one argv list. Language-agnostic: the repo says how it is
+    linted, tested, and verified; the factory only runs the commands."""
+
+    setup: list[list[str]] = field(default_factory=list)
+    lint: list[list[str]] = field(default_factory=list)
+    test: list[list[str]] = field(default_factory=list)
+    verify: list[list[str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RepoRules:
+    """Per-repo layer, read from `.factory/rules.toml` in the repo. It may add
+    rules and deny patterns, never relax global ones."""
+
+    standards: list[str] = field(default_factory=list)
+    commands: RepoCommands = field(default_factory=RepoCommands)
+    evidence: list[str] = field(default_factory=list)
+    extra_deny_patterns: list[str] = field(default_factory=list)
+    protected_paths: list[str] = field(default_factory=list)
+    command_timeout_seconds: int = 900

@@ -1,0 +1,8 @@
+name = "an empty allowed-commenter rule with read features on produces a warning"
+include = ["_common.toml"]
+[settings.collaboration.allowed_commenters]
+users = []
+groups = []
+include_reporter = false
+[expect]
+warnings_contain = ["jira_comments.read_replies is on but the allowed-commenter rule is empty"]

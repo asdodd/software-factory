@@ -1,0 +1,41 @@
+name = "intake routes a new ticket to the right agent by its rules"
+include = ["_common.toml"]
+
+[settings.intake.routing]
+enabled = true
+rules = [{ agent = "docs-bot", components = ["docs"] }, { agent = "frontend-bot", repos = ["web/portal"] }]
+
+[[steps]]
+intake = { source = "api", event_id = "evt-1", project = "SIM", summary = "Document the release process", repo = "docs/handbook", components = ["docs"], reporter = "alice", trusted = true, fields = { acceptance_criteria = "- release steps listed" } }
+[[steps]]
+intake = { source = "api", event_id = "evt-1", project = "SIM", summary = "Document the release process", repo = "docs/handbook", components = ["docs"], reporter = "alice", trusted = true, fields = { acceptance_criteria = "- release steps listed" } }
+[[steps]]
+intake = { source = "api", event_id = "evt-2", project = "SIM", summary = "Speed up calc", repo = "web/portal", reporter = "mallory", trusted = false, fields = { acceptance_criteria = "- faster" } }
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "guide/release.md", content = "# Release\n\n1. Tag.\n" },
+  { result = { status = "done", summary = "Documented releases." } },
+]
+[settings.gates]
+forbid_new_doc_files = false
+
+[[steps]]
+run = "docs-bot"
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+ticket_count = 2
+outcomes = ["branch_pushed"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-ready-docs"]
+status = "In Review"
+assignee = "svc-factory-docs"
+[[expect.tickets]]
+key = "SIM-2"
+labels_exclude = ["ai-ready-frontend", "ai-ready"]
+status = "Open"
+comments_contain = ["A human must confirm readiness and apply the label."]

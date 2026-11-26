@@ -1,0 +1,9 @@
+name = "alpha-bot"
+service_account = "svc-alpha"
+team = "platform"
+repos = ["web/portal"]
+[filter]
+labels_any = ["ai-ready"]
+statuses = ["Ready for AI"]
+[overrides.labels]
+ready = "ai-ready"

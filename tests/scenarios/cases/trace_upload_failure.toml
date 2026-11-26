@@ -1,0 +1,13 @@
+name = "a trace upload failure queues for retry and never fails the ticket"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+trace_fail_puts = 1000
+[settings.trace_store]
+backend = "memory"
+[[steps]]
+run = "frontend-bot"
+[expect]
+outcomes = ["mr_opened"]
+trace_pending_at_least = 2
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"

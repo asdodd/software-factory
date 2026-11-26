@@ -1,0 +1,4 @@
+name = "the access policy cannot be disabled from the environment"
+env = { FACTORY__ACCESS_POLICY__ENABLED = "false" }
+[expect]
+startup_error = "access_policy.enabled can only be set in the global config file"

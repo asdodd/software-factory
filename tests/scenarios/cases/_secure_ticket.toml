@@ -1,0 +1,9 @@
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/secure"
+acceptance_criteria = "- multiply(a, b) returns the product"

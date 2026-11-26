@@ -1,0 +1,15 @@
+name = "an unreachable submodule blocks the ticket with a comment naming its path"
+include = ["_common.toml", "_submodules.toml"]
+agent_files = ["agents/app-bot.toml"]
+remove_repos = ["libs/core"]
+
+[[steps]]
+run = "app-bot"
+
+[expect]
+outcomes = ["blocked"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "Blocked"
+lease_released = true
+comments_contain = ["A submodule could not be checked out: vendor/core", "Paths: vendor/core"]

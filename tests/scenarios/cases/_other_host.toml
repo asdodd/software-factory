@@ -1,0 +1,38 @@
+# web/app's submodule lives on another host and is reached through a URL rewrite.
+[settings.git]
+url_rewrites = [{ match = "https://other-host.example/", replace = "file://{workdir}/var/sim/repos/other/" }]
+[settings.git.host_credentials."other-host.example"]
+token = { env = "SIM_OTHER_HOST_TOKEN" }
+[settings.plugins.git_host]
+adapter = "git_host.fake"
+settings = { repos_root = "var/sim/repos", requires_credentials = ["other-host.example"] }
+
+[[repos]]
+path = "other/shared"
+[repos.files]
+"shared.py" = "SHARED = 1\n"
+
+[[repos]]
+path = "web/app"
+submodules = { "vendor/shared" = "https://other-host.example/shared.git" }
+[repos.files]
+"src/app.py" = "print('app')\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
+
+[[tickets]]
+key = "SIM-1"
+summary = "Touch app"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/app"
+acceptance_criteria = "- app updated"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/app.py", content = "print('app v2')\n" },
+  { result = { status = "done", summary = "Updated app." } },
+]

@@ -1,0 +1,26 @@
+name = "overlapping filters: both agents see the ticket, only one works it"
+include = ["_common.toml", "_good_change.toml"]
+agent_files = ["agents/alpha-bot.toml", "agents/beta-bot.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+[[steps]]
+run = "alpha-bot"
+[[steps]]
+run = "beta-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+warnings_contain = ["alpha-bot and beta-bot have filters that may overlap"]
+[[expect.tickets]]
+key = "SIM-1"
+assignee = "svc-alpha"
+[expect.git]
+mrs = 1

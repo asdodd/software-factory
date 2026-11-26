@@ -1,0 +1,34 @@
+# web/app has a relative-URL submodule (vendor/core) that itself has a nested
+# relative-URL submodule (deep). libs/core moves on after web/app pins it.
+[[repos]]
+path = "libs/deep"
+[repos.files]
+"deep.py" = "DEEP = 1\n"
+
+[[repos]]
+path = "libs/core"
+submodules = { "deep" = "../deep.git" }
+[repos.files]
+"core.py" = "CORE = 1\n"
+
+[[repos]]
+path = "web/app"
+submodules = { "vendor/core" = "../../libs/core.git" }
+[repos.files]
+"src/app.py" = "from vendor.core import core\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
+
+[[commits]]
+path = "libs/core"
+files = { "later.py" = "LATER = 1\n" }
+
+[[tickets]]
+key = "SIM-1"
+summary = "Touch app"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/app"
+acceptance_criteria = "- app updated"
+

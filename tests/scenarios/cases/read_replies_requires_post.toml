@@ -1,0 +1,6 @@
+name = "enabling a feature whose dependency is off is a startup error that says so"
+include = ["_common.toml"]
+[overrides]
+disable = ["jira_comments.post"]
+[expect]
+startup_error = "feature 'jira_comments.read_replies' requires 'jira_comments.post', which is disabled"

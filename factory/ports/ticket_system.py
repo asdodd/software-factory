@@ -50,6 +50,10 @@ class TicketSystem(Protocol):
 
     def set_labels(self, key: TicketKey, add: Iterable[str] = (), remove: Iterable[str] = ()) -> Ticket: ...
 
+    def get_attachment(self, key: TicketKey, attachment_id: str) -> bytes:
+        """Raw bytes. Callers must pass them through AccessGuard.check_attachment before use."""
+        ...
+
     def validate_filter(self, filter: TicketFilter) -> None:
         """Raise InvalidRequest if the filter (incl. native escape hatch) is unusable. No I/O."""
         ...

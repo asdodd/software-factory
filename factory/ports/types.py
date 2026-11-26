@@ -358,6 +358,7 @@ class Command:
     cwd: str = "."
     env: Mapping[str, str] = field(default_factory=dict)
     timeout_seconds: float = 600.0
+    stdin_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -427,6 +428,8 @@ class Finding:
 
 class Outcome(enum.Enum):
     MR_OPENED = "mr_opened"
+    SPEC_REVIEW = "spec_review"
+    CLAIM_LOST = "claim_lost"
     BRANCH_PUSHED = "branch_pushed"
     NEEDS_INFO = "needs_info"
     BLOCKED = "blocked"

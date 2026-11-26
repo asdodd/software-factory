@@ -1,0 +1,33 @@
+name = "a bring-your-own CLI harness (anthropic_messages) works through the gateway and sees nothing restricted"
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+process_env = { SIM_SECRET = "should-not-leak", FACTORY_JIRA_TOKEN = "nope-nope-nope", AWS_SECRET_ACCESS_KEY = "nope-nope-nope" }
+
+[settings.harnesses.fake-cli]
+adapter = "harness.command"
+[settings.harnesses.fake-cli.settings]
+argv = ["python3", "{scenario_dir}/fixtures/fake_agent.py"]
+env = { GATEWAY_URL = "{gateway_url}", GATEWAY_TOKEN = "{gateway_token}", MODEL = "{model}", INSTRUCTIONS = "{instructions_file}", RESULT = "{result_file}", DIALECT = "anthropic_messages" }
+
+[settings.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "fake-cli"
+
+[[model]]
+stage = "implement"
+content = { path = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" }
+
+[[steps]]
+run = "secure-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+model_calls = { scripted = 3 }
+[expect.git]
+mrs = 1
+mr_description_contains = ["ISOLATION-OK via anthropic_messages"]
+[[expect.git.branch_files]]
+path = "web/secure"
+branch = "ai/secure-bot/SIM-1"
+contains = { "src/calc.py" = "def multiply" }

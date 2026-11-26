@@ -1,0 +1,8 @@
+name = "the S3 trace backend fails validation without an endpoint"
+[settings.trace_store]
+backend = "s3"
+[settings.trace_store.s3]
+bucket = "traces"
+encryption = { mode = "sse-kms", kms_key_id = "key-1" }
+[expect]
+startup_error = "trace_store.s3.endpoint_url is required"

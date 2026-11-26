@@ -1,0 +1,12 @@
+name = "jira_comments.post off produces no ticket comments"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+[overrides]
+disable = ["jira_comments.post", "jira_comments.read_replies"]
+[[steps]]
+run = "frontend-bot"
+[expect]
+outcomes = ["mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+bot_comments = 0

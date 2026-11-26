@@ -1,0 +1,17 @@
+name = "disabled features are never instantiated or contacted"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+
+[overrides]
+disable = ["review", "intake.email"]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+never_instantiated = ["mailbox", "monitor"]
+instantiated = ["ticket_system", "git_host", "harness:scripted"]
+model_calls = { scripted = 1 }
+[expect.git]
+mrs = 1
+mr_description_contains = ["Not reviewed."]

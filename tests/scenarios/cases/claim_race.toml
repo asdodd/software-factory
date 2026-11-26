@@ -1,0 +1,24 @@
+name = "claim race: another worker's lease lands after ours, so we back off"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+
+[[hooks]]
+after = "update"
+ticket = "SIM-1"
+action = "set_field"
+field = "lease_owner"
+value = "frontend-bot:other-worker"
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = []
+metrics = { claim_lost = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Progress"
+lease_owner = "frontend-bot:other-worker"
+bot_comments = 0
+[expect.git]
+no_pushes = true
+mrs = 0

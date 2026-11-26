@@ -54,6 +54,9 @@ stalled = "Open"
 failed = "Open"
 done = "Done"
 
+[workflow]
+priority_order = ["Highest", "High", "Medium", "Low", "Lowest"]
+
 [workflow.fields]
 lease_owner = "customfield_10001"
 lease_expires = "customfield_10002"

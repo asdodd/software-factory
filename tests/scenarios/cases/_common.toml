@@ -1,0 +1,25 @@
+# Shared fixtures. Files starting with "_" are includes, not scenarios.
+
+[[repos]]
+path = "web/portal"
+[repos.files]
+"src/calc.py" = "def add(a, b):\n    return a + b\n"
+"tests/test_calc.py" = "import sys, unittest\nsys.path.insert(0, \"src\")\nfrom calc import add\n\nclass T(unittest.TestCase):\n    def test_add(self):\n        self.assertEqual(add(2, 3), 5)\n"
+".factory/rules.toml" = "standards = [\"STANDARDS.md\"]\n[commands]\ntest = [[\"python3\", \"-m\", \"unittest\", \"discover\", \"-s\", \"tests\"]]\n"
+"STANDARDS.md" = "Functions are small and tested."
+".gitlab-ci.yml" = "test:\n  script: python3 -m unittest\n"
+
+[[repos]]
+path = "docs/handbook"
+[repos.files]
+"guide/intro.md" = "# Intro\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('docs ok')\"]]\n"
+
+[[model]]
+stage = "triage"
+content = { difficulty = "easy", reason = "small change" }
+repeat = true
+[[model]]
+stage = "review"
+content = { summary = "Looks fine.", blast_radius = "local", merge_danger = "low", architecture_diff = "none" }
+repeat = true

@@ -1,0 +1,9 @@
+name = "app-bot"
+service_account = "svc-app"
+team = "platform"
+repos = ["web/app"]
+[filter]
+labels_any = ["ai-ready-frontend"]
+statuses = ["Ready for AI"]
+[overrides.labels]
+ready = "ai-ready-frontend"
