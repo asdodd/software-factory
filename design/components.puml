@@ -14,7 +14,13 @@ package "factory.core" {
   [claim + push library] as PUSH
   [dedupe + intake service] as INTAKE
   [budget wrapper] as BUDGET
-  [agent tool loop] as LOOP
+  [workspace isolator\n(policy applied, history replaced)] as ISO
+  [model gateway (loopback)\nopenai_chat | anthropic_messages] as GW
+  [harness: builtin tool loop] as LOOP
+  [harness: command (any CLI agent)] as CMD
+}
+package "bring your own" {
+  [external agent CLI] as EXT
 }
 package "factory.access" { [PolicyAccessGuard] as GUARD }
 package "factory.skills.base" { [no-proprietary-files\n(+ global rules)] as SKILLS }
@@ -24,6 +30,7 @@ package "factory.ports (Protocols)" {
   interface GitHost
   interface Mailbox
   interface ModelProvider
+  interface AgentHarness
   interface Sandbox
   interface AccessGuard
   interface Notifier
@@ -54,10 +61,17 @@ CLI --> PIPE
 PIPE --> READY
 PIPE --> PUSH
 PIPE --> INTAKE
-PIPE --> LOOP
-LOOP --> BUDGET
+PIPE --> ISO
+ISO --> AccessGuard
+PIPE --> AgentHarness : run(task)
+LOOP ..|> AgentHarness
+CMD ..|> AgentHarness
+CMD --> EXT : argv in Sandbox
+EXT --> GW : only model route
+LOOP --> GW
 LOOP --> AccessGuard
-LOOP --> SKILLS
+PIPE --> SKILLS : rendered into\ninstructions file
+GW --> BUDGET
 BUDGET --> ModelProvider
 BUDGET --> Accounting
 PUSH --> TicketSystem
@@ -75,4 +89,5 @@ JIRA ..|> TicketSystem
 GITLAB ..|> GitHost
 MAIL ..|> Mailbox
 MODELS ..|> ModelProvider
+note bottom of MODELS : any number of named providers;\nstages pick provider + model
 @enduml

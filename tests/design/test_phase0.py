@@ -142,7 +142,63 @@ class ArchitectureTest(unittest.TestCase):
 
     def test_schema_plugin_slots_match_ports(self):
         slots = {f.name for f in dataclasses.fields(schema.PluginsConfig)} - {"aliases"}
-        self.assertEqual(slots, set(PORTS) - {"trace_store"})
+        self.assertEqual(slots, set(PORTS) - {"trace_store", "model_provider", "agent_harness"})
+
+
+def merged(*layers: dict) -> dict:
+    out: dict = {}
+    for layer in layers:
+        for key, value in layer.items():
+            if isinstance(value, dict) and isinstance(out.get(key), dict):
+                out[key] = merged(out[key], value)
+            else:
+                out[key] = value
+    return out
+
+
+class BringYourOwnTest(unittest.TestCase):
+    STAGES = [f.name for f in dataclasses.fields(schema.StageModels)]
+
+    def _effective(self, profile: str, agent: str | None = None) -> schema.FactoryConfig:
+        layers = [load(ROOT / "config/base.toml"), load(ROOT / f"config/profiles/{profile}.toml")]
+        if agent:
+            overrides = load(ROOT / f"config/agents/{agent}.toml").get("overrides", {})
+            layers.append({k: v for k, v in overrides.items() if k != "labels"})
+        return build(schema.FactoryConfig, merged(*layers))
+
+    def test_every_stage_names_a_declared_provider_and_harness(self):
+        cases = [(p, None) for p in ("sim", "staging", "prod")]
+        cases += [("sim", a.stem) for a in (ROOT / "config/agents").glob("*.toml")]
+        for profile, agent in cases:
+            cfg = self._effective(profile, agent)
+            for stage in self.STAGES:
+                with self.subTest(profile=profile, agent=agent, stage=stage):
+                    sm = getattr(cfg.models.stages, stage)
+                    self.assertIn(sm.provider, cfg.models.providers)
+                    if sm.harness:
+                        self.assertIn(sm.harness, cfg.harnesses)
+
+    def test_several_providers_can_coexist(self):
+        cfg = build(schema.FactoryConfig, {
+            "models": {
+                "providers": {
+                    "gov": {"adapter": "model_provider.openai_compatible"},
+                    "gateway": {"adapter": "my_pkg.models:GatewayProvider"},
+                },
+                "stages": {
+                    "implement": {"provider": "gov", "model": "big", "harness": "mine"},
+                    "review": {"provider": "gateway", "model": "other"},
+                },
+            },
+            "harnesses": {"mine": {"adapter": "harness.command", "settings": {"argv": ["my-agent", "{instructions_file}"]}}},
+        })
+        self.assertNotEqual(cfg.models.stages.implement.provider, cfg.models.stages.review.provider)
+
+    def test_harness_task_carries_no_upstream_credentials(self):
+        from factory.ports.types import HarnessTask, ModelEndpoint
+        self.assertEqual({f.name for f in dataclasses.fields(ModelEndpoint)}, {"base_url", "token", "model", "dialects"})
+        names = {f.name for f in dataclasses.fields(HarnessTask)}
+        self.assertFalse(names & {"api_key", "credentials", "repo_token", "ticket_system", "git_host"})
 
 
 if __name__ == "__main__":

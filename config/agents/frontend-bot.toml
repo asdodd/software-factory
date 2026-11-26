@@ -19,9 +19,14 @@ max_in_flight = 2
 [overrides.labels]
 ready = "ai-ready-frontend"
 
-[overrides.models.stages]
-implement = "sim-large"
-review = "sim-reviewer"
+[overrides.models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "scripted"
+
+[overrides.models.stages.review]
+provider = "scripted"
+model = "sim-reviewer"
 
 [overrides.limits]
 max_files_changed = 20

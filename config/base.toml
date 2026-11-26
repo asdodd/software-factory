@@ -29,6 +29,9 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "model_provider.scripted" = "factory.adapters.fake.model_provider:ScriptedModelProvider"
 "model_provider.replay"  = "factory.adapters.models.replay:ReplayModelProvider"
 "model_provider.openai_compatible" = "factory.adapters.models.openai_compatible:OpenAICompatibleProvider"
+"harness.builtin"        = "factory.core.harness.builtin:BuiltinHarness"
+"harness.command"        = "factory.core.harness.command:CommandHarness"
+"harness.scripted"       = "factory.adapters.fake.harness:ScriptedHarness"
 "sandbox.local_dir"      = "factory.adapters.fake.sandbox:LocalDirSandbox"
 "access_guard.policy"    = "factory.access.guard:PolicyAccessGuard"
 "notifier.fake"          = "factory.adapters.fake.notifier:FakeNotifier"
@@ -158,18 +161,76 @@ keyword = "/followup"
 enabled = false
 rules = []                               # [{agent = "docs-bot", components = ["docs"]}]
 
-[models.stages]                          # implementer and reviewer configured separately
-triage = ""
-spec = ""
-implement = ""
-review = ""
-intake = ""
-grading = ""
+# Bring your own model: declare any number of providers under [models.providers.<name>]
+# (profiles do this), then point each stage at a provider and model by name.
+# Implementer and reviewer are configured separately; use a different model or
+# provider for review to avoid correlated blind spots.
+# Bring your own harness: `harness` names an entry under [harnesses]. Only stages
+# that drive a tool loop (implement, optionally review) need one.
+[models.stages.triage]
+provider = ""
+model = ""
+[models.stages.spec]
+provider = ""
+model = ""
+[models.stages.implement]
+provider = ""
+model = ""
+harness = "builtin"
+[models.stages.review]
+provider = ""
+model = ""
+[models.stages.intake]
+provider = ""
+model = ""
+[models.stages.grading]
+provider = ""
+model = ""
 [models.budgets]                         # 0 = no limit at this scope
 user_tokens_per_day = 0
 team_tokens_per_day = 0
 agent_tokens_per_day = 0
 requests_per_minute = 0
+
+# Harnesses. Every harness gets the same thing: an isolated workspace copy
+# (access policy applied, history replaced by one baseline commit), a rendered
+# instructions file (ticket, spec, base skills, global and repo rules), and a
+# loopback model gateway URL with a per-run token. It never gets upstream model
+# credentials, ticket or git-host credentials, or the real clone. The factory
+# diffs the result, runs the PR gates, and pushes.
+[harnesses.builtin]
+adapter = "harness.builtin"               # in-house tool loop; tools go through AccessGuard
+timeout_minutes = 60
+max_turns = 200
+
+# Any CLI agent can be wrapped by harness.command. Placeholders:
+#   {workspace} {instructions_file} {result_file} {gateway_url} {gateway_token}
+#   {model} {max_turns}
+# The harness may write {result_file} as JSON:
+#   {"status": "done|needs_info|blocked|failed", "summary": "...", "questions": ["..."]}
+# Otherwise exit code 0 = done, non-zero = failed, summary = tail of stdout.
+# Examples (uncomment and adapt; the executable must be installed on the box):
+#
+# [harnesses.aider]
+# adapter = "harness.command"
+# [harnesses.aider.settings]
+# argv = ["aider", "--yes-always", "--no-auto-commits", "--model", "openai/{model}",
+#         "--message-file", "{instructions_file}"]
+# env = { OPENAI_API_BASE = "{gateway_url}/v1", OPENAI_API_KEY = "{gateway_token}" }
+# dialect = "openai_chat"
+#
+# [harnesses.claude-code]
+# adapter = "harness.command"
+# [harnesses.claude-code.settings]
+# argv = ["claude", "-p", "--max-turns", "{max_turns}", "--model", "{model}"]
+# stdin_file = "{instructions_file}"
+# env = { ANTHROPIC_BASE_URL = "{gateway_url}", ANTHROPIC_API_KEY = "{gateway_token}" }
+# dialect = "anthropic_messages"
+
+[gateway]
+bind_host = "127.0.0.1"
+dialects = ["openai_chat", "anthropic_messages"]
+request_timeout_seconds = 300
 
 [gates]
 max_comment_density = 0.15

@@ -4,6 +4,7 @@ from factory.ports.access_guard import AccessGuard
 from factory.ports.accounting import Accounting
 from factory.ports.clock import Clock, IdSource
 from factory.ports.git_host import GitHost
+from factory.ports.harness import AgentHarness
 from factory.ports.mailbox import Mailbox
 from factory.ports.model_provider import ModelProvider
 from factory.ports.monitor import Monitor
@@ -18,6 +19,7 @@ PORTS: dict[str, type] = {
     "git_host": GitHost,
     "mailbox": Mailbox,
     "model_provider": ModelProvider,
+    "agent_harness": AgentHarness,
     "sandbox": Sandbox,
     "access_guard": AccessGuard,
     "notifier": Notifier,
@@ -31,6 +33,7 @@ PORTS: dict[str, type] = {
 
 __all__ = [
     "PORTS",
+    "AgentHarness",
     "AccessGuard",
     "Accounting",
     "Clock",

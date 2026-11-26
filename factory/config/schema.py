@@ -31,7 +31,6 @@ class PluginsConfig:
     ticket_system: PluginSelection = field(default_factory=PluginSelection)
     git_host: PluginSelection = field(default_factory=PluginSelection)
     mailbox: PluginSelection = field(default_factory=PluginSelection)
-    model_provider: PluginSelection = field(default_factory=PluginSelection)
     sandbox: PluginSelection = field(default_factory=PluginSelection)
     access_guard: PluginSelection = field(default_factory=PluginSelection)
     notifier: PluginSelection = field(default_factory=PluginSelection)
@@ -277,13 +276,27 @@ class IntakeConfig:
 
 
 @dataclass(frozen=True)
+class StageModel:
+    """Which model serves a stage, and which harness drives it.
+
+    provider: a key of models.providers (bring your own model).
+    harness: a key of harnesses (bring your own harness); "" = single model
+      calls with no tool loop, which is all triage, spec, and intake need.
+    """
+
+    provider: str = ""
+    model: str = ""
+    harness: str = ""
+
+
+@dataclass(frozen=True)
 class StageModels:
-    triage: str = ""
-    spec: str = ""
-    implement: str = ""
-    review: str = ""
-    intake: str = ""
-    grading: str = ""
+    triage: StageModel = field(default_factory=StageModel)
+    spec: StageModel = field(default_factory=StageModel)
+    implement: StageModel = field(default_factory=lambda: StageModel(harness="builtin"))
+    review: StageModel = field(default_factory=StageModel)
+    intake: StageModel = field(default_factory=StageModel)
+    grading: StageModel = field(default_factory=StageModel)
 
 
 @dataclass(frozen=True)
@@ -296,8 +309,36 @@ class BudgetsConfig:
 
 @dataclass(frozen=True)
 class ModelsConfig:
+    """providers: name -> ModelProvider plugin. Several may be configured at
+    once (e.g. a government endpoint and a gateway); stages pick by name."""
+
+    providers: dict[str, PluginSelection] = field(default_factory=dict)
     stages: StageModels = field(default_factory=StageModels)
     budgets: BudgetsConfig = field(default_factory=BudgetsConfig)
+
+
+@dataclass(frozen=True)
+class GatewayConfig:
+    """Loopback model gateway handed to every harness. It is the harness's
+    only route to a model, so budgets, accounting, redaction, and trace
+    capture apply to bring-your-own harnesses too."""
+
+    bind_host: str = "127.0.0.1"
+    dialects: list[Literal["openai_chat", "anthropic_messages"]] = field(
+        default_factory=lambda: ["openai_chat", "anthropic_messages"]
+    )
+    request_timeout_seconds: int = 300
+
+
+@dataclass(frozen=True)
+class HarnessConfig:
+    """`adapter` is an alias or 'pkg.module:Class' implementing AgentHarness.
+    `settings` is validated by the adapter (e.g. argv template for harness.command)."""
+
+    adapter: str = ""
+    timeout_minutes: int = 60
+    max_turns: int = 200
+    settings: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -333,6 +374,8 @@ class FactoryConfig:
     access_policy: AccessPolicyConfig = field(default_factory=AccessPolicyConfig)
     intake: IntakeConfig = field(default_factory=IntakeConfig)
     models: ModelsConfig = field(default_factory=ModelsConfig)
+    harnesses: dict[str, HarnessConfig] = field(default_factory=dict)
+    gateway: GatewayConfig = field(default_factory=GatewayConfig)
     gates: GatesConfig = field(default_factory=GatesConfig)
     features: dict[str, bool] = field(default_factory=dict)
 

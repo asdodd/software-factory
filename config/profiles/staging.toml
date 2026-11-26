@@ -33,9 +33,10 @@ folder = "INBOX"
 processed_folder = "Processed"
 password = { env = "FACTORY_MAIL_PASSWORD" }
 
-[plugins.model_provider]
+# Bring your own model: add more [models.providers.<name>] blocks as needed.
+[models.providers.primary]
 adapter = "model_provider.openai_compatible"
-[plugins.model_provider.settings]
+[models.providers.primary.settings]
 base_url = ""
 api_key = { env = "FACTORY_MODEL_API_KEY" }
 timeout_seconds = 300
@@ -98,13 +99,25 @@ needs_info = ""
 stalled = ""
 spec_approved = ""
 
-[models.stages]
-triage = ""
-spec = ""
-implement = ""
-review = ""
-intake = ""
-grading = ""
+[models.stages.triage]
+provider = "primary"
+model = ""
+[models.stages.spec]
+provider = "primary"
+model = ""
+[models.stages.implement]
+provider = "primary"
+model = ""
+harness = "builtin"
+[models.stages.review]
+provider = "primary"
+model = ""
+[models.stages.intake]
+provider = "primary"
+model = ""
+[models.stages.grading]
+provider = "primary"
+model = ""
 
 [trace_store]
 backend = "s3"

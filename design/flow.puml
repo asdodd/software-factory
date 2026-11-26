@@ -63,9 +63,12 @@ else (easy)
 endif
 :Clone + submodules (fixed argv git);
 :AccessGuard.scan_workspace\n(strip | deny_read);
-:Load base skills + global rules\n+ repo rules file;
-:Implement on agent branch\n(all tools via AccessGuard);
-:Lint + tests in sandbox;
+:Isolated copy: access policy applied,\ngit history replaced by one baseline commit;
+:Render instructions file: ticket, spec,\nbase skills, global + repo rules;
+:Start loopback model gateway\n(per-run token, budgets, redaction, trace);
+:Harness implements\n(builtin or bring-your-own CLI);
+:Factory diffs copy vs baseline, rejects\n.git / submodule / restricted / protected paths,\napplies to agent branch in real clone;
+:Lint + tests in sandbox (factory-run);
 :Review (different model/context):\nstandards, blast radius, arch diff;
 :Verify: evidence from real code path;
 

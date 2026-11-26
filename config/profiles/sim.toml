@@ -14,8 +14,12 @@ settings = { repos_root = "var/sim/repos" }
 [plugins.mailbox]
 adapter = "mailbox.fake"
 
-[plugins.model_provider]
+[models.providers.scripted]
 adapter = "model_provider.scripted"
+settings = { scripts = "tests/scenarios/fixtures/model_scripts" }
+
+[harnesses.scripted]
+adapter = "harness.scripted"
 
 [plugins.sandbox]
 adapter = "sandbox.local_dir"
@@ -88,13 +92,25 @@ default_issue_type = "Task"
 default_project = "SIM"
 default_issue_type = "Task"
 
-[models.stages]
-triage = "sim-small"
-spec = "sim-large"
-implement = "sim-large"
-review = "sim-reviewer"
-intake = "sim-small"
-grading = "sim-small"
+[models.stages.triage]
+provider = "scripted"
+model = "sim-small"
+[models.stages.spec]
+provider = "scripted"
+model = "sim-large"
+[models.stages.implement]
+provider = "scripted"
+model = "sim-large"
+harness = "scripted"
+[models.stages.review]
+provider = "scripted"
+model = "sim-reviewer"
+[models.stages.intake]
+provider = "scripted"
+model = "sim-small"
+[models.stages.grading]
+provider = "scripted"
+model = "sim-small"
 
 [trace_store.local_fs]
 root = "var/sim/traces"

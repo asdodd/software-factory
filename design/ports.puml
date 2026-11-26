@@ -36,6 +36,14 @@ interface Mailbox {
 interface ModelProvider {
   complete(request) : ModelResponse
 }
+interface AgentHarness <<bring your own>> {
+  run(task: HarnessTask) : HarnessResult
+}
+note right of AgentHarness
+  task: isolated workspace, instructions file,
+  result file, gateway endpoint + per-run token,
+  timeout, max_turns. No upstream credentials.
+end note
 interface Sandbox {
   prepare(spec) : Workspace
   run(workspace, command) : CommandResult

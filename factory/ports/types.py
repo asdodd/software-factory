@@ -505,3 +505,54 @@ class BudgetDecision:
     scope: SpendScope | None = None
     spent_tokens: int = 0
     limit_tokens: int | None = None
+
+
+@dataclass(frozen=True)
+class ModelEndpoint:
+    """What a harness is given to reach a model: the factory's loopback
+    gateway, never the upstream provider or its credentials."""
+
+    base_url: str
+    token: str
+    model: str
+    dialects: tuple[str, ...]
+
+
+class HarnessStatus(enum.Enum):
+    DONE = "done"
+    NEEDS_INFO = "needs_info"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    TIMED_OUT = "timed_out"
+
+
+@dataclass(frozen=True)
+class HarnessTask:
+    """One stage of work handed to a harness.
+
+    workspace is an isolated copy: the access policy is already applied and git
+    history is replaced by a single baseline commit, so no harness can read
+    restricted files from the tree or from history. The factory, not the
+    harness, diffs the result and carries it to the real branch.
+    instructions_file holds the rendered prompt: ticket, approved spec, base
+    skills, global rules, and repo rules. result_file is where the harness may
+    write a HarnessResult as JSON.
+    """
+
+    run_id: str
+    stage: str
+    ticket_key: TicketKey
+    workspace: Workspace
+    instructions_file: Path
+    result_file: Path
+    endpoint: ModelEndpoint
+    timeout_seconds: float
+    max_turns: int
+
+
+@dataclass(frozen=True)
+class HarnessResult:
+    status: HarnessStatus
+    summary: str
+    questions: tuple[str, ...] = ()
+    events: tuple[TraceEvent, ...] = ()
