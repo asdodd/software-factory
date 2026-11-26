@@ -10,6 +10,10 @@ class Clock(Protocol):
         """Timezone-aware UTC."""
         ...
 
+    def sleep(self, seconds: float) -> None:
+        """Wait. The fake clock advances instead, so paced simulations stay instant."""
+        ...
+
 
 @runtime_checkable
 class IdSource(Protocol):

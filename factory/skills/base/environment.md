@@ -1,6 +1,6 @@
 # Base skill: work within the request budget (mandatory)
 
-This deployment is limited by the number of model requests per hour, not by tokens. Every turn you take costs a request, so a long prompt is cheap and an extra round trip is expensive.
+This deployment is limited by the number of model requests, not by tokens. Requests are paced: when the limit is reached each one waits its turn, which can take most of a minute. Every turn you take costs one, so a long prompt is cheap and an extra round trip is slow and takes capacity from other work.
 
 - Plan first, then act. Gather what you need in as few turns as possible.
 - Batch independent tool calls into one turn: read several files together, run related searches together.

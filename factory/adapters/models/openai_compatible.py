@@ -1,5 +1,8 @@
 """OpenAI-compatible chat completions provider, for a government endpoint or
-an internal gateway. Written from the published API schema and exercised only
+an internal gateway. The endpoint may be request-limited with a timed
+back-off: 429/503 responses are waited out (Retry-After honored, backoff
+capped at max_backoff_seconds) for up to rate_limit_max_wait_seconds
+(0 = no limit) instead of failing the call. Written from the published API schema and exercised only
 through the ModelProvider contract suite against a fixture emulator."""
 
 from __future__ import annotations
@@ -40,8 +43,11 @@ class OpenAICompatibleProvider:
         headers = {"Authorization": f"Bearer {key}",
                    **{str(k): str(v) for k, v in dict(settings.get("headers", {})).items()}}
         transport = transport or urllib_transport(str(settings.get("ca_bundle_path", "")), bool(settings.get("verify", True)))
-        return cls(HttpClient(base_url, headers, transport, float(settings.get("timeout_seconds", 300)),
-                              int(settings.get("max_retries", 3))), dict(settings.get("extra_body", {})))
+        http = HttpClient(base_url, headers, transport, float(settings.get("timeout_seconds", 300)),
+                          int(settings.get("max_retries", 3)), patient=True,
+                          patient_max_wait_seconds=float(settings.get("rate_limit_max_wait_seconds", 0)),
+                          max_backoff_seconds=float(settings.get("max_backoff_seconds", 60)))
+        return cls(http, dict(settings.get("extra_body", {})))
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         body: dict = {"model": request.model, "messages": [to_wire(m) for m in request.messages],

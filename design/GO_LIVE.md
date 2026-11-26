@@ -44,10 +44,11 @@ This list is generated from the validator.
 
 **Models** (any provider name under `models.providers`; use a different one for review)
 - `models.stages.triage.model`, `spec`, `implement`, `review`, `respond`, `intake`, `grading`, `improve`. Only the stages whose features are on are validated.
-- `models.stages.implement.harness`: `claude` (the default), `codex`, `cline`, `jam-claude` or `jam-codex`.
+- `models.stages.implement.harness`: `jam-claude` (the default), `jam-codex`, `claude`, `codex` or `cline`. `jam` must be on the worker's `PATH`.
 
 **Requests and capabilities** (these have defaults, but set them for your endpoint)
-- `models.budgets.requests_per_hour` (your endpoint's limit) and `max_wait_seconds`; `limits.max_requests_per_ticket`
+- `models.budgets.min_request_interval_seconds` (for example `40`) and/or `requests_per_hour`, with `max_wait_seconds = 0` to wait rather than defer. `limits.max_requests_per_ticket` is the per-ticket runaway guard.
+- `models.providers.primary.settings.timeout_seconds` (one hour in the prod profile) and `rate_limit_max_wait_seconds` (`0`: wait out back-offs indefinitely)
 - `[capabilities] subagents` and `internet`: these decide how the rules and skills read, and whether Claude Code's Task tool is enabled
 
 ## 3. Also review (they have safe defaults)

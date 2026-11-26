@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -14,6 +15,9 @@ class SystemClock:
 
     def now(self) -> datetime:
         return datetime.now(UTC)
+
+    def sleep(self, seconds: float) -> None:
+        time.sleep(max(0.0, seconds))
 
 
 class UuidIdSource:

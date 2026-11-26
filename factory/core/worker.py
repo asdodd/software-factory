@@ -177,8 +177,11 @@ class Worker:
                             ticket_key=ticket.key, config_hash=self.config_hash)
         recorder.repo = readiness.text_field(ticket, "repo")
         recorder.event("run", {"mode": mode}, always=True)
-        models = BudgetedModels.for_config(self.c.provider, self.accounting, self.clock, self.cfg, recorder)
+        holder: list[_Run] = []
+        models = BudgetedModels.for_config(self.c.provider, self.accounting, self.clock, self.cfg, recorder,
+                                           on_request=lambda: holder[0].heartbeat() if holder else None)
         run = _Run(self, ticket, mode, run_id, recorder, models, answers, rounds, fix)
+        holder.append(run)
         try:
             report = run.execute_fix() if fix else run.execute()
         except Stop as stop:
@@ -192,6 +195,8 @@ class Worker:
             report = run.fail(f"Internal error ({type(exc).__name__}). See the trace for run {run_id}.")
         finally:
             run.cleanup()
+        if models.waited_seconds:
+            recorder.event("request_pacing", {"waited_seconds": round(models.waited_seconds, 1)}, always=True)
         recorder.event("outcome", {"outcome": report.outcome.value, "detail": report.detail}, always=True)
         recorder.finish(report.outcome)
         self.metrics.incr("runs", outcome=report.outcome.value, agent=self.name)
@@ -223,6 +228,8 @@ class _Run:
         self.evidence: list[Artifact] = []
         self.check_logs: list[str] = []
         self.quality_flags: list[str] = []
+        self.leased = fix is None
+        self.last_renewal = worker.clock.now()
 
     # ---- helpers -----------------------------------------------------------
     def say(self, milestone: str, note: Note) -> str | None:
@@ -238,6 +245,7 @@ class _Run:
         return resp.message.content
 
     def release(self) -> None:
+        self.leased = False
         self.w.claimer.release(self.key)
 
     def stage_skills(self, stage: str, has_spec: bool):
@@ -249,8 +257,19 @@ class _Run:
 
     def renew(self) -> None:
         if self.fix is None and not self.w.dry_run:
-            expires = self.w.clock.now() + timedelta(minutes=self.cfg.limits.lease_minutes)
+            now = self.w.clock.now()
+            expires = now + timedelta(minutes=self.cfg.limits.lease_minutes)
             self.w.writes.update(self.key, {"lease_owner": self.w.worker_id, "lease_expires": expires.isoformat()})
+            self.last_renewal = now
+
+    def heartbeat(self) -> None:
+        """Called on every model request and pacing step: keep the lease alive through slow,
+        paced runs, renewing at most every third of the lease period."""
+        if not self.leased:
+            return
+        last = getattr(self, "last_renewal", None)
+        if last is None or (self.w.clock.now() - last) >= timedelta(minutes=self.cfg.limits.lease_minutes / 3):
+            self.renew()
 
     def labels(self, add=(), remove=()) -> None:
         self.w.writes.set_labels(self.key, add, remove)

@@ -39,6 +39,9 @@ class MemoryAccounting:
                 total += r.usage.total
         return total
 
+    def last_request_at(self) -> datetime | None:
+        return max((r.at for r in self.records), default=None)
+
     def request_count(self, scope: SpendScope | None = None, since: datetime | None = None) -> int:
         return sum(1 for r in self.records if (since is None or r.at >= since)
                    and (scope is None or _scope_ids(r.context)[scope.kind] == scope.id))

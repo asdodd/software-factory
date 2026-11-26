@@ -106,6 +106,8 @@ if os.environ.get("EXPECT_SKILL"):
     need("/.factory/artifacts" in prompt, "prompt does not name the working-notes directory")
 if os.environ.get("EXPECT_NO_SUBAGENT_FLAG") and tool == "claude":
     need("--disallowedTools" in args and args[args.index("--disallowedTools") + 1] == "Task", "Task tool not disabled")
+if os.environ.get("EXPECT_LONG_TIMEOUT") and tool == "claude":
+    need(int(os.environ.get("API_TIMEOUT_MS", "0")) >= 3600000, "Claude Code request timeout too short for paced requests")
 if os.environ.get("EXPECT_SUBAGENT_FLAG_ABSENT") and tool == "claude":
     need("--disallowedTools" not in args, "Task tool disabled although sub-agents are allowed")
 

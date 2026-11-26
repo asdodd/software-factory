@@ -52,6 +52,8 @@ def test_filled_prod_profile_builds_every_port_from_real_adapters(tmp_path):
     assert isinstance(container.provider("primary"), OpenAICompatibleProvider)
     assert isinstance(container.trace_store(), S3TraceStore)
     assert "mailbox" not in built, "email intake is off, so the mailbox is never built"
+    assert loaded.config.models.stages.implement.harness == "jam-claude"
+    assert loaded.config.harnesses["jam-claude"].settings == {"agent": "claude", "launcher": "jam"}
 
 
 def test_unfilled_prod_profile_lists_what_to_fill(tmp_path):

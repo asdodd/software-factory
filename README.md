@@ -32,7 +32,7 @@ The agent works with people through Jira comments (questions, answers, a stall t
 
 ## Agents do the work: Claude Code, Codex, Cline
 
-The factory has no tool loop of its own. A CLI agent does each implementation: `claude`, `codex` or `cline`, launched directly or through `jam` (`jam-claude`, `jam-codex`). Any other CLI can be wrapped with `harness.command`. You pick the harness per stage and per agent; the default is `claude`.
+The factory has no tool loop of its own. A CLI agent does each implementation. The default is **`jam-claude`** (Claude Code launched as `jam claude ...`); the other options are `jam-codex`, `claude`, `codex` and `cline`, and any other CLI can be wrapped with `harness.command`. You pick the harness per stage and per agent.
 
 - **Models:** declare any number of providers under `[models.providers.<name>]`, then pick a provider and model per stage. A different provider for review avoids correlated blind spots.
 - **What every agent gets:** an isolated workspace (restricted files removed, git history replaced), a task prompt, and a loopback model gateway with a per-run token. An agent never gets upstream credentials.
@@ -51,15 +51,24 @@ The factory has no tool loop of its own. A CLI agent does each implementation: `
 - The mandatory base skills are also repeated in the prompt: tokens are cheap, and they must not be missed.
 - `delivery = "inline"` puts everything in the prompt instead, which saves even the skill-loading turn.
 
-## Requests are the budget
+## Requests are the budget, and they're paced, not failed
 
-The deployment is assumed to be limited by **requests per hour**, not tokens, so the factory optimizes for fewer round trips:
+The endpoint is limited by **requests**, not tokens. When the limit is reached, it backs off instead of erroring, so in practice a new request is served about every 40 seconds. The factory works with that:
 
-- **A mandatory base skill** (`factory/skills/base/environment.md`) tells every agent to batch tool calls, read each file once, make complete edits, and stop when done.
-- **Sub-agents.** When `[capabilities] subagents = false` (the default), it forbids sub-agents. Claude Code is also started with `--disallowedTools Task`.
-- **Per-ticket cap.** `limits.max_requests_per_ticket` fails a ticket that runs away.
-- **Hourly window.** `models.budgets.requests_per_hour` throttles every model request through the factory: calls wait for room up to `max_wait_seconds`. A ticket that still can't get room is deferred (released and returned to ready), not failed.
-- **Metrics.** `factory metrics` reports requests per ticket.
+- **Pacing, not failing.** Every model request through the factory waits for its slot:
+  - `models.budgets.min_request_interval_seconds` spaces requests, for example `40`;
+  - `requests_per_hour` keeps a rolling window;
+  - both are shared by every agent through accounting.
+
+  With `max_wait_seconds = 0` (the default), a request waits as long as it takes. A positive value defers the ticket back to ready after that long, still never failing it.
+- **Upstream back-offs are waited out.** The OpenAI-compatible provider retries 429 and 503 responses, honoring `Retry-After` and capping the backoff at `max_backoff_seconds`, for up to `rate_limit_max_wait_seconds` (`0` means no limit). It doesn't give up after three tries.
+- **Long timeouts.** Claude Code gets `API_TIMEOUT_MS=3600000`, Codex gets a one-hour stream idle timeout, the default harness timeout is 6 hours, and the prod model timeout is one hour. A paced run can be slow without being killed.
+- **Leases stay alive.** Every request and every pacing step renews the ticket's lease (at most every third of the lease period), so a multi-hour run isn't reclaimed by another worker.
+- **Fewer requests.**
+  - A mandatory base skill (`factory/skills/base/environment.md`) tells agents to batch tool calls, read each file once, make complete edits, and stop when done.
+  - With `[capabilities] subagents = false` (the default), it forbids sub-agents, and Claude Code also gets `--disallowedTools Task`.
+- **Runaway guard.** `limits.max_requests_per_ticket` (default 400) is the factory's own cap on a single ticket, not the endpoint's limit. It stops one stuck ticket from consuming the shared budget.
+- **Metrics.** `factory metrics` reports requests per ticket, and each run's trace records the time spent waiting for request slots.
 
 ## Capabilities: one skill text, rendered per environment
 

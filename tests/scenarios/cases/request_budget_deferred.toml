@@ -1,0 +1,17 @@
+name = "with a positive max_wait_seconds, a ticket that cannot get a request slot in time is deferred, not failed"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+[settings.models.budgets]
+min_request_interval_seconds = 3600
+max_wait_seconds = 60
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["deferred"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "Ready for AI"
+lease_released = true
+labels_exclude = ["ai-failed"]
+comments_contain = ["Deferred", "no request slot within 60s"]

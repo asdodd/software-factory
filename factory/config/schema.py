@@ -343,15 +343,21 @@ class StageModels:
 
 @dataclass(frozen=True)
 class BudgetsConfig:
-    """Token budgets per day, and request budgets for request-limited endpoints.
-    requests_per_hour counts every model request through the factory; when the
-    window is full, calls wait up to max_wait_seconds for room, then fail."""
+    """Token budgets per day, and pacing for request-limited endpoints.
+
+    A request-limited endpoint backs off instead of failing, so the factory
+    paces rather than fails: min_request_interval_seconds spaces every model
+    request through the factory (all agents share it), and requests_per_hour
+    keeps a rolling window. A call waits for its slot; max_wait_seconds = 0
+    means wait as long as it takes (a positive value defers the ticket to a
+    later cycle instead)."""
 
     user_tokens_per_day: int = 0
     team_tokens_per_day: int = 0
     agent_tokens_per_day: int = 0
+    min_request_interval_seconds: float = 0.0
     requests_per_hour: int = 0
-    max_wait_seconds: int = 600
+    max_wait_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -383,7 +389,7 @@ class HarnessConfig:
     `settings` is validated by the adapter (e.g. argv template for harness.command)."""
 
     adapter: str = ""
-    timeout_minutes: int = 60
+    timeout_minutes: int = 360
     max_turns: int = 200
     settings: dict[str, object] = field(default_factory=dict)
 

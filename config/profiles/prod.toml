@@ -39,7 +39,8 @@ adapter = "model_provider.openai_compatible"
 [models.providers.primary.settings]
 base_url = ""
 api_key = { env = "FACTORY_MODEL_API_KEY" }
-timeout_seconds = 300
+timeout_seconds = 3600                   # a paced request can take minutes
+rate_limit_max_wait_seconds = 0          # wait out 429/503 back-offs indefinitely
 ca_bundle_path = ""
 
 [plugins.sandbox]
@@ -112,7 +113,7 @@ model = ""
 [models.stages.implement]
 provider = "primary"
 model = ""
-harness = "claude"
+harness = "jam-claude"
 [models.stages.review]
 provider = "primary"
 model = ""

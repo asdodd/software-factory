@@ -119,7 +119,8 @@ max_tokens_per_ticket = 2000000
 max_files_changed = 15                   # readiness "bounded scope" and PR gate
 max_diff_lines = 600
 max_denied_access_attempts = 5           # run stops and comments after this many
-max_requests_per_ticket = 400            # model requests across all stages; the ticket fails past this
+max_requests_per_ticket = 400            # runaway guard: a ticket using more model requests than this fails
+                                         # (the endpoint's own limit never fails a ticket; it is paced)
 
 [git]
 executable = "git"
@@ -196,7 +197,7 @@ model = ""
 [models.stages.implement]
 provider = ""
 model = ""
-harness = "claude"                       # claude | codex | cline | jam-claude | jam-codex | your own
+harness = "jam-claude"                   # jam-claude | jam-codex | claude | codex | cline | your own
 [models.stages.review]
 provider = ""
 model = ""
@@ -216,8 +217,11 @@ model = ""
 user_tokens_per_day = 0
 team_tokens_per_day = 0
 agent_tokens_per_day = 0
-requests_per_hour = 0                    # the endpoint's request limit; every model request counts
-max_wait_seconds = 600                   # when the hour is full, wait this long for room, then fail the call
+# The endpoint backs off instead of failing, so the factory paces requests rather
+# than failing them. Every model request through the factory shares these.
+min_request_interval_seconds = 0         # e.g. 40 to match an endpoint that serves one request every 40s
+requests_per_hour = 0                    # rolling window; 0 = no window
+max_wait_seconds = 0                     # 0 = wait as long as it takes; >0 defers the ticket after that long
 
 # Harnesses: the factory has no tool loop of its own; a CLI agent does the work.
 # Every harness gets an isolated workspace copy (access policy applied, history

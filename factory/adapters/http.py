@@ -1,6 +1,7 @@
 """Small HTTP client shared by the real adapters: JSON in and out, explicit
 timeouts, a configured CA bundle, bounded retries on 429/5xx honoring
-Retry-After, and errors mapped to port errors. Secrets never appear in error
+Retry-After (or, in patient mode for request-limited endpoints, waiting out
+429/503 back-offs for as long as configured), and errors mapped to port errors. Secrets never appear in error
 messages. The transport is injectable so contract tests run against fixtures;
 the default transport (urllib) is never used in this build's tests."""
 
@@ -60,6 +61,9 @@ class HttpClient:
     max_retries: int = 3
     sleep: Callable[[float], None] = time.sleep
     calls: list[tuple[str, str]] = field(default_factory=list)
+    patient: bool = False  # on 429/503, keep waiting out the back-off instead of giving up
+    patient_max_wait_seconds: float = 0.0  # 0 = no limit
+    max_backoff_seconds: float = 60.0
 
     def request(self, method: str, path: str, query: Mapping[str, object] | None = None, json_body: object = None,
                 raw: bytes | None = None, extra_headers: Mapping[str, str] | None = None,
@@ -72,14 +76,23 @@ class HttpClient:
         if json_body is not None:
             body = json.dumps(json_body).encode()
             headers["Content-Type"] = "application/json"
-        for attempt in range(self.max_retries + 1):
+        attempt = 0
+        waited = 0.0
+        while True:
             self.calls.append((method, path))
             resp = self.transport(method, url, headers, body, self.timeout_seconds)
-            if resp.status in (429, 502, 503, 504) and attempt < self.max_retries:
-                retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
-                self.sleep(float(retry_after) if retry_after and str(retry_after).isdigit() else 0.5 * 2 ** attempt)
-                continue
-            break
+            throttled = resp.status in (429, 503)
+            retry = resp.status in (429, 502, 503, 504) and attempt < self.max_retries
+            if throttled and self.patient:
+                retry = not self.patient_max_wait_seconds or waited < self.patient_max_wait_seconds
+            if not retry:
+                break
+            retry_after = resp.headers.get("Retry-After") or resp.headers.get("retry-after")
+            delay = float(retry_after) if retry_after and str(retry_after).isdigit() else 0.5 * 2 ** min(attempt, 10)
+            delay = min(delay, self.max_backoff_seconds)
+            self.sleep(delay)
+            waited += delay
+            attempt += 1
         if 200 <= resp.status < 300 or resp.status in ok:
             return resp
         where = f"{method} {path}"
