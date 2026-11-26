@@ -1,0 +1,20 @@
+name = "a grader that disagrees with human labels is not trusted"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_factory_repo.toml"]
+
+[[model]]
+stage = "grading"
+content = { verbosity = 5, wasted_tool_calls = 9, excess_tests = 4, notes = "harsh" }
+repeat = true
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+calibrate = [{ run_id = "run-0001", verbosity = 1, wasted_tool_calls = 0, excess_tests = 0 }]
+[[steps]]
+grade = true
+
+[expect]
+[expect.feedback]
+calibration_trusted = false
+grades = 1
+grades_calibrated = false

@@ -16,7 +16,8 @@ factory = "factory.cli.main:main"
 include = ["factory*"]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1", "ruff==0.16.9"]
+dev = ["pytest==9.1.1", "ruff==0.16.9", "boto3==1.44.12"]
+s3 = ["boto3==1.44.12"]
 
 [tool.ruff]
 line-length = 120

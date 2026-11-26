@@ -1,0 +1,36 @@
+name = "metrics: cost per ticket, MR acceptance, review rounds, stage times, intake override rate"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+[overrides]
+enable = ["intake.email"]
+
+[[model]]
+stage = "intake"
+content = { summary = "Make things faster", repo = "", acceptance_criteria = [] }
+
+[[steps]]
+set_mr_state = { state = "merged" }
+[[steps]]
+advance_minutes = 10
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "faster", body = "Make it faster.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+set_labels = { ticket = "SIM-2", add = ["ai-ready"] }
+[[steps]]
+intake_poll = true
+[[steps]]
+metrics = true
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.feedback.metrics]
+runs = 1
+tickets = 1
+cost_per_ticket_tokens = 300.0
+mr_acceptance_rate = 1.0
+review_rounds_mean = 0.0
+intake_override_rate = 1.0
+outcomes = { mr_opened = 1 }

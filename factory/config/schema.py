@@ -278,6 +278,17 @@ class GitlabIntakeConfig:
 
 
 @dataclass(frozen=True)
+class MonitoringIntakeConfig:
+    """Findings from configured monitors are trusted sources; auto_label decides
+    whether a ready finding is labeled without a human (draft-only by default)."""
+
+    auto_label: bool = False
+    default_project: str = ""
+    default_issue_type: str = ""
+    min_severity: Literal["info", "low", "medium", "high", "critical"] = "medium"
+
+
+@dataclass(frozen=True)
 class RoutingRule:
     """First matching rule wins. Empty match fields are wildcards."""
 
@@ -297,6 +308,7 @@ class RoutingConfig:
 class IntakeConfig:
     email: EmailIntakeConfig = field(default_factory=EmailIntakeConfig)
     gitlab: GitlabIntakeConfig = field(default_factory=GitlabIntakeConfig)
+    monitoring: MonitoringIntakeConfig = field(default_factory=MonitoringIntakeConfig)
     routing: RoutingConfig = field(default_factory=RoutingConfig)
     dedupe_window_days: int = 90
     override_window_days: int = 14
@@ -325,6 +337,7 @@ class StageModels:
     intake: StageModel = field(default_factory=StageModel)
     grading: StageModel = field(default_factory=StageModel)
     respond: StageModel = field(default_factory=StageModel)
+    improve: StageModel = field(default_factory=StageModel)
 
 
 @dataclass(frozen=True)
@@ -367,6 +380,35 @@ class HarnessConfig:
     timeout_minutes: int = 60
     max_turns: int = 200
     settings: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class GradingConfig:
+    """The grader is trusted only after calibration against human judgments
+    reaches min_agreement (each score within tolerance of the human's)."""
+
+    lookback_days: int = 7
+    max_runs_per_job: int = 200
+    min_agreement: float = 0.8
+    tolerance: int = 1
+
+
+@dataclass(frozen=True)
+class SelfImprovementConfig:
+    """Proposals are opened as MRs against the factory repo; nothing is applied
+    automatically. Edits outside allowed_paths are dropped."""
+
+    repo: str = ""
+    base_branch: str = "main"
+    allowed_paths: list[str] = field(default_factory=lambda: ["factory/skills/**", "config/agents/**"])
+    max_files: int = 10
+    lookback_days: int = 14
+
+
+@dataclass(frozen=True)
+class FeedbackConfig:
+    grading: GradingConfig = field(default_factory=GradingConfig)
+    self_improvement: SelfImprovementConfig = field(default_factory=SelfImprovementConfig)
 
 
 @dataclass(frozen=True)
@@ -420,6 +462,7 @@ class FactoryConfig:
     gateway: GatewayConfig = field(default_factory=GatewayConfig)
     gates: GatesConfig = field(default_factory=GatesConfig)
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
+    feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
     features: dict[str, bool] = field(default_factory=dict)
 
 

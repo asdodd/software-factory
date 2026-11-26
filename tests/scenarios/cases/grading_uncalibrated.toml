@@ -1,0 +1,24 @@
+name = "grades from an uncalibrated grader are marked so, and self-improvement refuses to use them"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_factory_repo.toml"]
+
+[[model]]
+stage = "grading"
+content = { verbosity = 2, wasted_tool_calls = 0, excess_tests = 0, notes = "fine" }
+repeat = true
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+grade = true
+[[steps]]
+grade = true
+[[steps]]
+improve = true
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.feedback]
+grades = 1
+grades_calibrated = false
+proposal_opened = false
+proposal_reason_contains = "not calibrated"

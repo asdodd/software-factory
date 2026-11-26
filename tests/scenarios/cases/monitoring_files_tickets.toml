@@ -1,0 +1,23 @@
+name = "monitor findings file tickets through intake, deduped, with a severity floor"
+include = ["_common.toml", "_monitoring.toml"]
+
+[[steps]]
+monitor_finding = { id = "reg-1", source = "regression", repo = "web/portal", location = "tests/test_calc.py::test_add", summary = "test_add fails on negative inputs", details = "AssertionError: add(-1, -2) != -3", severity = "high" }
+[[steps]]
+monitor_finding = { id = "reg-2", source = "regression", repo = "web/portal", location = "tests/test_calc.py::test_add", summary = "test_add fails on negative inputs", details = "same failure, next run", severity = "high" }
+[[steps]]
+monitor_finding = { id = "prod-9", source = "production", repo = "web/portal", location = "api/latency", summary = "p50 latency up 2%", severity = "low" }
+[[steps]]
+intake_poll = true
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 1
+metrics = { monitor_findings_below_threshold = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+summary = "test_add fails on negative inputs"
+labels_exclude = ["ai-ready"]
+field_contains = { repo = "web/portal", acceptance_criteria = "no longer reproduces" }
+comments_contain = ["proposed ready", "draft-only mode is on", "A matching report arrived from monitor:regression"]

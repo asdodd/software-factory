@@ -125,6 +125,9 @@ model = ""
 [models.stages.respond]
 provider = "primary"
 model = ""
+[models.stages.improve]
+provider = "primary"
+model = ""
 
 [collaboration]
 factory_identity = ""

@@ -40,6 +40,7 @@ DRAFT_PROMPT = (
 AUTO_HEADERS = {"precedence": ("bulk", "list", "junk", "auto_reply"), "x-autoreply": None, "x-autorespond": None,
                 "x-auto-response-suppress": None}
 TEXT_TYPES = ("text/", "application/json", "application/xml")
+SEVERITIES = ["info", "low", "medium", "high", "critical"]
 
 
 def _addr(value: str) -> str:
@@ -76,6 +77,8 @@ class IntakeRunner:
             results += self.poll_email()
         if self.features.on("intake.gitlab_comments"):
             results += self.poll_gitlab()
+        if self.features.on("monitoring") and self.features.on("intake.monitoring"):
+            results += self.poll_monitor()
         self.service.reconcile(self.metrics)
         return results
 
@@ -282,3 +285,31 @@ class IntakeRunner:
                     else f"Created follow-up ticket {result.ticket_key}: {url}")
             self.writes.host_comment(event, text, f"intake-reply:{event.event_id}")
         return result
+
+    # ---- monitoring ------------------------------------------------------------------
+    def poll_monitor(self) -> list[IntakeResult]:
+        cfg = self.cfg.intake.monitoring
+        monitor = self.c.port("monitor")
+        cursor = self.state.get("intake-cursor", "monitor")
+        page = monitor.poll_findings(cursor)
+        floor = SEVERITIES.index(cfg.min_severity)
+        results = []
+        for f in page.items:
+            level = SEVERITIES.index(f.severity) if f.severity in SEVERITIES else len(SEVERITIES) - 1
+            if level < floor:
+                self.metrics.incr("monitor_findings_below_threshold", source=f.source)
+                continue
+            details = self.guard.filter_output(f.details).text
+            result = self.service.submit(IntakeEvent(
+                source=f"monitor:{f.source}", event_id=f.event_id, project=cfg.default_project,
+                summary=f.summary[:250], description=f"{details}\n\nSeverity: {f.severity}. Location: {f.location}. "
+                                                    f"Reported by monitor {f.source}.",
+                issue_type=cfg.default_issue_type or "Bug", repo=f.repo, location=f.location,
+                reporter="", trusted=True, auto_label=cfg.auto_label,
+                fields={"acceptance_criteria": f"- The {f.source} finding no longer reproduces: {f.summary[:200]}",
+                        "verify_steps": f"Re-run the {f.source} monitor; the finding is gone."},
+            ))
+            results.append(result)
+        if page.next_cursor:
+            self.state.put("intake-cursor", "monitor", page.next_cursor)
+        return results

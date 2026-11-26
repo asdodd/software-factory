@@ -122,6 +122,16 @@ model = "sim-small"
 [models.stages.respond]
 provider = "scripted"
 model = "sim-small"
+[models.stages.improve]
+provider = "scripted"
+model = "sim-large"
+
+[feedback.self_improvement]
+repo = "platform/software-factory"
+
+[intake.monitoring]
+default_project = "SIM"
+default_issue_type = "Bug"
 
 [notifications]
 spec_review = ["carol"]

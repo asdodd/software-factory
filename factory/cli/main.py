@@ -72,6 +72,17 @@ def parser() -> argparse.ArgumentParser:
     _common(p)
     p.add_argument("--loop", action="store_true")
     p.add_argument("--interval", type=float, default=60.0)
+    p = sub.add_parser("metrics", help="feedback metrics from traces and intake state")
+    _common(p)
+    p.add_argument("--days", type=int, default=7)
+    p.add_argument("--agent")
+    p.add_argument("--format", choices=["json", "prometheus"], default="json")
+    p = sub.add_parser("grade", help="grade recent traces, or calibrate the grader against human labels")
+    _common(p)
+    p.add_argument("--calibrate", metavar="LABELS.jsonl",
+                   help="JSON lines: run_id, verbosity, wasted_tool_calls, excess_tests")
+    p = sub.add_parser("improve", help="propose factory improvements as a merge request (never applies them)")
+    _common(p)
     scen = sub.add_parser("scenario", help="run declarative simulation scenarios")
     ssub = scen.add_subparsers(dest="action", required=True)
     p = ssub.add_parser("run")
@@ -189,6 +200,70 @@ def cmd_intake(args) -> int:
         time.sleep(args.interval)
 
 
+def _container(args):
+    from factory.core.container import Container
+
+    loaded = _load(args)
+    _print_diagnostics(loaded)
+    if loaded.profile == "sim":
+        from factory.testing import netguard
+        netguard.install()
+    container = Container(loaded)
+    logging.getLogger().addFilter(RedactingFilter(container.redactor))
+    return loaded, container
+
+
+def _require(loaded, feature: str) -> bool:
+    if not loaded.features.on(feature):
+        print(f"feature {feature} is off; enable it in config or with --enable {feature}", file=sys.stderr)
+        return False
+    return True
+
+
+def cmd_metrics(args) -> int:
+    from datetime import timedelta
+
+    from factory.core import metrics_report
+
+    loaded, container = _container(args)
+    if not _require(loaded, "feedback.metrics") or not _require(loaded, "feedback.trace_store"):
+        return 2
+    now = container.port("clock").now()
+    report = metrics_report.compute(container.trace_store(), container.port("state_store"),
+                                    now - timedelta(days=args.days), now, args.agent)
+    print(metrics_report.prometheus(report) if args.format == "prometheus" else json.dumps(report, indent=2))
+    return 0
+
+
+def cmd_grade(args) -> int:
+    from factory.core.grading import Grader
+
+    loaded, container = _container(args)
+    if not _require(loaded, "feedback.grading"):
+        return 2
+    grader = Grader(container)
+    if args.calibrate:
+        labels = [json.loads(line) for line in Path(args.calibrate).read_text().splitlines() if line.strip()]
+        cal = grader.calibrate(labels)
+        verdict = "trusted" if cal.trusted else "NOT trusted"
+        print(f"grader {cal.model}: agreement {cal.agreement:.0%} over {cal.runs} labeled run(s); {verdict}")
+        return 0 if cal.trusted else 1
+    for g in grader.grade():
+        print(json.dumps(g, sort_keys=True))
+    return 0
+
+
+def cmd_improve(args) -> int:
+    from factory.core.improve import SelfImprovement
+
+    loaded, container = _container(args)
+    if not _require(loaded, "feedback.self_improvement"):
+        return 2
+    proposal = SelfImprovement(container).run()
+    print(f"{'opened ' + proposal.mr_url if proposal.opened else 'no proposal'}: {proposal.reason}")
+    return 0
+
+
 def cmd_scenario(args) -> int:
     from factory.testing import netguard
     from factory.testing.scenario import run_file
@@ -208,7 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     args = parser().parse_args(argv)
     handlers = {"config": cmd_config, "features": cmd_features, "agents": cmd_agents, "run": cmd_run,
-                "scenario": cmd_scenario, "intake": cmd_intake}
+                "scenario": cmd_scenario, "intake": cmd_intake,
+                "metrics": cmd_metrics, "grade": cmd_grade, "improve": cmd_improve}
     try:
         return handlers[args.command](args)
     except ConfigError as exc:

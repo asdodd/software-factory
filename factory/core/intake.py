@@ -10,6 +10,7 @@ not-ready verdict, or a factory-applied label removed) and each confirmation."""
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -142,6 +143,14 @@ class IntakeService:
         return IntakeResult(ticket.key, True, routed_to=agent, ready=labeled, missing=result.failures,
                             verdict=verdict, label=label)
 
+    def _count(self, name: str, source: str) -> None:
+        while True:
+            raw = self.state.get("intake-stats", "all")
+            stats = json.loads(raw or "{}")
+            stats.setdefault(source, {"overrides": 0, "confirmations": 0})[name] += 1
+            if self.state.compare_and_set("intake-stats", "all", raw, json.dumps(stats, sort_keys=True)):
+                return
+
     def reconcile(self, metrics) -> list[dict]:
         """Record human overrides of intake verdicts. Returns the overrides found this pass."""
         found = []
@@ -166,6 +175,7 @@ class IntakeService:
             record = {"ticket": key, "source": v["source"], "verdict": v["verdict"], "outcome": outcome,
                       "at": self.clock.now().isoformat()}
             self.overrides.put(key, record)
+            self._count("overrides" if outcome.startswith("override") else "confirmations", v["source"])
             metrics.incr("intake_overrides" if outcome.startswith("override") else "intake_confirmations",
                          source=v["source"])
             self.verdicts.delete(key)

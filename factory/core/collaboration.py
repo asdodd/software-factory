@@ -22,6 +22,7 @@ from factory.ports.types import (
     MergeRequestState,
     Message,
     Outcome,
+    OutcomeRecord,
     Principal,
     PrincipalKind,
     RepoRef,
@@ -151,7 +152,7 @@ def poll_mrs(w: Worker) -> list[RunReport]:
         mr = w.git.get_merge_request(repo, info["id"])
         ticket = w.tickets.get(key)
         if mr.state is not MergeRequestState.OPEN:
-            stop_watching(w, key, f"The merge request was {mr.state.value}.", info)
+            stop_watching(w, key, f"The merge request was {mr.state.value}.", info, mr.state.value)
             continue
         if w.clock.now() - datetime.fromisoformat(info["last_activity"]) >= timedelta(days=mr_cfg.inactivity_timeout_days):
             stop_watching(w, key, f"No review activity for {mr_cfg.inactivity_timeout_days} days.", info)
@@ -174,9 +175,20 @@ def poll_mrs(w: Worker) -> list[RunReport]:
     return reports
 
 
-def stop_watching(w: Worker, key: str, why: str, info: dict) -> None:
+def stop_watching(w: Worker, key: str, why: str, info: dict, state: str = "inactive") -> None:
     w.mrs.delete(key)
     w.mr_index.remove(key)
+    w.metrics.incr("mr_outcomes", state=state, agent=w.name)
+    if info.get("run_id") and info.get("run_started"):
+        writer = w.c.trace_writer(w.features.on("feedback.trace_store"))
+        try:
+            writer.append_outcome(OutcomeRecord(
+                info["run_id"], w.clock.now(), f"mr_{state}",
+                {"mr": info["id"], "fix_rounds": int(info.get("fix_rounds", 0))}, w.name, key,
+                datetime.fromisoformat(info["run_started"])))
+            writer.flush()
+        except Exception:  # noqa: BLE001 - trace storage never blocks the loop
+            log.exception("could not record the MR outcome for %s", key)
     w.writes.comment(key, "mr_feedback", Note("Stopped watching the merge request", "in review", done=why,
                                               details=f"Fix rounds used: {info.get('fix_rounds', 0)}."),
                      f"mrstop:{key}:{info['id']}")
