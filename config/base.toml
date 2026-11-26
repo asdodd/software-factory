@@ -31,6 +31,7 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "model_provider.openai_compatible" = "factory.adapters.models.openai_compatible:OpenAICompatibleProvider"
 "harness.builtin"        = "factory.core.harness.builtin:BuiltinHarness"
 "harness.command"        = "factory.core.harness.command:CommandHarness"
+"harness.cli_agent"      = "factory.core.harness.cli_agents:CliAgentHarness"
 "harness.scripted"       = "factory.adapters.fake.harness:ScriptedHarness"
 "sandbox.local_dir"      = "factory.adapters.sandbox.local_dir:LocalDirSandbox"
 "trace_store.memory"     = "factory.adapters.trace.stores:MemoryTraceStore"
@@ -207,29 +208,44 @@ adapter = "harness.builtin"               # in-house tool loop; tools go through
 timeout_minutes = 60
 max_turns = 200
 
-# Any CLI agent can be wrapped by harness.command. Placeholders:
+# Known CLI agents: Claude Code, Codex, and Cline, run directly or through jam
+# (`jam claude ...`, `jam codex ...`). Each is pointed at the loopback gateway
+# with a per-run token. Pick one per stage and per agent, e.g.
+#   [models.stages.implement] harness = "jam-claude"
+# Settings: agent, launcher (direct | jam), executable, jam_executable, jam_name,
+# args (replace preset arguments), extra_args, env. See factory/core/harness/cli_agents.py.
+[harnesses.claude]
+adapter = "harness.cli_agent"
+settings = { agent = "claude" }
+
+[harnesses.codex]
+adapter = "harness.cli_agent"
+settings = { agent = "codex" }
+
+[harnesses.cline]
+adapter = "harness.cli_agent"
+settings = { agent = "cline" }
+
+[harnesses.jam-claude]
+adapter = "harness.cli_agent"
+settings = { agent = "claude", launcher = "jam" }
+
+[harnesses.jam-codex]
+adapter = "harness.cli_agent"
+settings = { agent = "codex", launcher = "jam" }
+
+# Any other CLI agent can be wrapped by harness.command. Placeholders:
 #   {workspace} {instructions_file} {result_file} {gateway_url} {gateway_token}
 #   {model} {max_turns}
 # The harness may write {result_file} as JSON:
 #   {"status": "done|needs_info|blocked|failed", "summary": "...", "questions": ["..."]}
 # Otherwise exit code 0 = done, non-zero = failed, summary = tail of stdout.
-# Examples (uncomment and adapt; the executable must be installed on the box):
 #
-# [harnesses.aider]
+# [harnesses.my-agent]
 # adapter = "harness.command"
-# [harnesses.aider.settings]
-# argv = ["aider", "--yes-always", "--no-auto-commits", "--model", "openai/{model}",
-#         "--message-file", "{instructions_file}"]
-# env = { OPENAI_API_BASE = "{gateway_url}/v1", OPENAI_API_KEY = "{gateway_token}" }
-# dialect = "openai_chat"
-#
-# [harnesses.claude-code]
-# adapter = "harness.command"
-# [harnesses.claude-code.settings]
-# argv = ["claude", "-p", "--max-turns", "{max_turns}", "--model", "{model}"]
-# stdin_file = "{instructions_file}"
-# env = { ANTHROPIC_BASE_URL = "{gateway_url}", ANTHROPIC_API_KEY = "{gateway_token}" }
-# dialect = "anthropic_messages"
+# [harnesses.my-agent.settings]
+# argv = ["my-agent", "--task-file", "{instructions_file}"]
+# env = { OPENAI_BASE_URL = "{gateway_url}/v1", OPENAI_API_KEY = "{gateway_token}" }
 
 [gateway]
 bind_host = "127.0.0.1"

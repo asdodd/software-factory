@@ -106,19 +106,38 @@ def _check_one(label: str, cfg: FactoryConfig, features: FeatureStates, out: lis
             out.append(Diagnostic("error", f"{prefix}models.stages.implement.harness is required"))
         if sm.harness and sm.harness not in cfg.harnesses:
             out.append(Diagnostic("error", f"{prefix}models.stages.{stage}.harness: unknown harness {sm.harness!r}"))
-        elif sm.harness and cfg.access_policy.mode == "deny_read":
-            adapter = cfg.harnesses[sm.harness].adapter
-            if adapter not in TOOL_LOOP_HARNESSES and not _sandbox_hides_paths(cfg):
-                out.append(Diagnostic(
-                    "error",
-                    f"{prefix}access_policy.mode = deny_read cannot be enforced for harness {sm.harness!r}; "
-                    "use mode = strip or a sandbox that hides paths",
-                ))
+        elif sm.harness:
+            _check_harness(prefix, sm.harness, cfg, out)
     for channel, needs in (("jira", "jira_comments.read_replies"), ("mr", "mr.read_comments")):
         if features.on(needs) and rule_is_empty(effective_rule(cfg, channel)):
             out.append(Diagnostic(
                 "warning", f"{prefix}{needs} is on but the allowed-commenter rule is empty: all replies will be ignored"
             ))
+
+
+def _check_harness(prefix: str, name: str, cfg: FactoryConfig, out: list) -> None:
+    from factory.config.loader import Diagnostic
+
+    h = cfg.harnesses[name]
+    try:
+        cls = resolve_class(h.adapter, cfg.plugins.aliases)
+    except PluginError as exc:
+        out.append(Diagnostic("error", f"{prefix}harnesses.{name}.adapter: {exc}"))
+        return
+    validate = getattr(cls, "validate_settings", None)
+    for problem in validate(h.settings) if validate else ():
+        out.append(Diagnostic("error", f"{prefix}harnesses.{name}.{problem}"))
+    dialect = getattr(cls, "required_dialect", None)
+    needed = dialect(h.settings) if dialect else None
+    if needed and needed not in cfg.gateway.dialects:
+        out.append(Diagnostic("error", f"{prefix}harness {name!r} needs gateway dialect {needed}; "
+                                       "add it to gateway.dialects"))
+    if cfg.access_policy.mode == "deny_read" and h.adapter not in TOOL_LOOP_HARNESSES and not _sandbox_hides_paths(cfg):
+        out.append(Diagnostic(
+            "error",
+            f"{prefix}access_policy.mode = deny_read cannot be enforced for harness {name!r}; "
+            "use mode = strip or a sandbox that hides paths",
+        ))
 
 
 def _sandbox_hides_paths(cfg: FactoryConfig) -> bool:

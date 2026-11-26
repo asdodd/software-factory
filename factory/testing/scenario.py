@@ -62,8 +62,10 @@ def run_file(path: Path | str, root: Path = REPO_ROOT, keep: bool = False) -> Sc
     path = Path(path)
     data = load_file(path)
     workdir = Path(tempfile.mkdtemp(prefix="factory-scenario-"))
-    saved = {k: os.environ.get(k) for k in data.get("process_env", {})}
-    os.environ.update({k: str(v) for k, v in data.get("process_env", {}).items()})
+    process_env = _substitute(data.get("process_env", {}), {
+        "workdir": str(workdir), "scenario_dir": str(path.parent.resolve()), "PATH": os.environ.get("PATH", "")})
+    saved = {k: os.environ.get(k) for k in process_env}
+    os.environ.update({k: str(v) for k, v in process_env.items()})
     try:
         return run(data, root, workdir, path.parent)
     finally:

@@ -53,10 +53,30 @@ The full pipeline runs end to end against fakes in the `sim` profile:
 
 **Two agents side by side.** `frontend-bot` (merge_request mode) and `docs-bot` (branch_only, with spec off) each claim only their own tickets. Overlapping filters produce a warning, and the lease prevents a double claim.
 
+## CLI agent harnesses: Claude Code, Codex, Cline, and jam
+
+`harness.cli_agent` (`factory/core/harness/cli_agents.py`) runs a known CLI agent in the sandbox on the isolated workspace. It can launch the agent directly (`claude ...`) or through jam (`jam claude ...`, `jam codex ...`). `config/base.toml` ships five ready-made harnesses: `claude`, `codex`, `cline`, `jam-claude` and `jam-codex`. You pick one per stage and per agent, for example `[models.stages.implement] harness = "jam-claude"`.
+
+| Preset | Invocation | Model route | Final result read from |
+|---|---|---|---|
+| claude | `claude -p --output-format json --max-turns N --model M --dangerously-skip-permissions`, prompt on stdin | `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` set to the gateway (Anthropic dialect); non-essential traffic, auto-update and telemetry disabled | the `result` field of the JSON output |
+| codex | `codex exec --full-auto --skip-git-repo-check --model M -c model_provider="factory" ... --output-last-message F -`, prompt on stdin | a `factory` provider defined with `-c` flags pointing at the gateway (`wire_api = "chat"`), plus `OPENAI_BASE_URL` | the last-message file |
+| cline | `cline --yolo --model M "<prompt>"` | `OPENAI_BASE_URL` / `OPENAI_API_KEY` set to the gateway | stdout |
+
+- **jam:** `launcher = "jam"` turns the command into `jam <name> <same arguments>`. `jam_executable` and `jam_name` are configurable, and any agent can use jam.
+- **Reporting status:** each agent is told to end its final message with a one-line JSON status (`done`, `needs_info`, `blocked` or `failed`, plus a summary and questions). The factory parses that line. If there isn't one, exit code 0 means done.
+- **Settings checked at startup:** an unknown agent, a bad launcher, or a gateway dialect the agent needs but isn't enabled all fail `config validate`. A missing binary fails the ticket with "jam is not installed in the sandbox" (or the agent's binary name).
+- **Overrides without code changes:** if a tool's flags differ on the box, `settings.args` replaces the preset arguments, and `extra_args` and `env` add to them.
+- **What the tests prove:** fake `claude`, `codex`, `cline` and `jam` executables (`tests/scenarios/cases/fixtures/`) check the exact flags and environment each preset passes. They call the gateway in the right dialect, apply the edit, and confirm from inside the sandbox that they can't see restricted files, restricted history or leaked environment variables. Each preset produces a gated MR, directly and through jam. The real binaries were not run.
+- **To confirm on the box:**
+  - The **Cline** CLI flags are my best understanding and need checking.
+  - **Codex** must accept `-c` provider overrides and `-` for a prompt on stdin.
+  - The tools may try to reach other hosts (update checks, telemetry). The `local_dir` sandbox does not block that; a network-isolated sandbox plugin would.
+
 ## Test results
 
-- 109 tests and 36 subtests pass; ruff reports no issues.
-- 39 declarative scenarios in `tests/scenarios/cases/`, one TOML file each, covering every §12 scenario that belongs to Phase 1:
+- 117 tests and 36 subtests pass; ruff reports no issues.
+- 47 declarative scenarios in `tests/scenarios/cases/`, one TOML file each, covering every §12 scenario that belongs to Phase 1:
   - **Pipeline:** happy path; not-ready ticket bounced; claim race; lease reclaim; spend cap exceeded; protected paths; disabled features never instantiated; two agents; overlapping filters; labels changing between listing and claiming.
   - **Config and output modes:** per-agent override; intake routing; intake dedupe and idempotency; branch_only; merge_request; mr.* features rejected in branch_only; read_replies requiring post; jira_comments.post off; empty-commenter warning.
   - **Needs-info and run controls:** needs-info pause; dry run.
