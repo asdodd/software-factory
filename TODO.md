@@ -31,6 +31,20 @@ Each of these has a working default today; it's a config change or a small code 
 - [ ] **Refresh the vendored copies** from upstream periodically: re-copy from a new commit and update `factory/skills/vendor/SOURCES.toml`. Never edit them in place.
 - [ ] **Check token cost** of the inline skills per stage (`skills.max_chars_per_stage`, default 60k characters) against your model budget.
 
+## Agents, capabilities and request budget
+
+- [ ] **Set `[capabilities]`** for your environment. Defaults: `subagents = false`, `internet = false`. Override per agent if one environment differs.
+- [ ] **Set `models.budgets.requests_per_hour`** to your endpoint's limit (leave headroom for intake, review and grading), and tune `limits.max_requests_per_ticket` after a week of `factory metrics` (requests per ticket).
+- [ ] **Verify native delivery on the box:**
+  - Claude Code reads `~/.claude/CLAUDE.md` and `~/.claude/skills`;
+  - Codex reads `~/.codex/AGENTS.md` and `~/.codex/skills`;
+  - Cline reads `~/Documents/Cline/Rules/`.
+
+  The sandbox sets `HOME` to the run's workspace root. Paths can be adjusted in `factory/core/harness/cli_agents.py` if a version differs.
+- [ ] **Confirm the sub-agent tool name** in your Claude Code version is `Task`, used for `--disallowedTools Task` when sub-agents are off. Codex and Cline have no equivalent flag, so for them the written rule is the brake.
+- [ ] **Consider Claude Code hooks** (a PreToolUse hook calling a factory guard check) to restore per-tool-call auditing of restricted paths. The builtin harness that did this was removed; isolation plus the diff gates remain the enforcement.
+- [ ] **Decide the default delivery.** `skills.delivery = "native"` follows each agent's own mechanisms but costs one skill-loading turn per run. `"inline"` saves that request.
+
 ## To go live
 
 See [design/GO_LIVE.md](design/GO_LIVE.md) for the exact keys.

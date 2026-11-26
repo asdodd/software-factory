@@ -3,12 +3,19 @@ name: code-review
 description: "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes: Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\"."
 ---
 
+<!-- Modified by software-factory: passages that need sub-agents or internet access are wrapped in factory:if blocks with single-session and offline alternatives. Upstream text is otherwise unchanged; see factory/skills/vendor/SOURCES.toml for the source commit. -->
+
+
 Two-axis review of the diff between `HEAD` and a fixed point the user supplies:
 
 - **Standards**: does the code conform to this repo's documented coding standards?
 - **Spec**: does the code faithfully implement the originating issue / spec?
 
+<!-- factory:if subagents -->
 Both axes run as **parallel sub-agents** so they don't pollute each other's context, then this skill aggregates their findings. Start every sub-agent with a fresh context window.
+<!-- factory:else -->
+Review the two axes one after the other in this session, keeping their findings strictly separate so neither colours the other, then aggregate. Do not start sub-agents.
+<!-- factory:end -->
 
 The issue tracker should have been provided to you. If not, tell the user to run `/setup-matt-pocock-skills`.
 
@@ -20,7 +27,11 @@ Whatever the user said is the fixed point (a commit SHA, branch name, tag, `main
 
 Capture the diff command once: `git diff <fixed-point>...HEAD` (three-dot, so the comparison is against the merge-base). Also note the list of commits via `git log <fixed-point>..HEAD --oneline`.
 
+<!-- factory:if subagents -->
 Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, not inside two parallel sub-agents.
+<!-- factory:else -->
+Before going further, confirm the fixed point resolves (`git rev-parse <fixed-point>`) and the diff is non-empty. A bad ref or empty diff should fail here, before either review pass.
+<!-- factory:end -->
 
 ### 2. Identify the spec source
 
@@ -29,7 +40,11 @@ Look for the originating spec, in this order:
 1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.), fetched via the workflow in the tracker doc.
 2. A path the user passed as an argument.
 3. A spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
+<!-- factory:if subagents -->
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
+<!-- factory:else -->
+4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** pass will skip and report "no spec available".
+<!-- factory:end -->
 
 ### 3. Identify the standards sources
 
@@ -55,6 +70,7 @@ Each smell reads *what it is* → *how to fix*; match it against the diff:
 - **Middle Man**: a class or function that mostly just delegates onward. → cut it, call the real target direct.
 - **Refused Bequest**: a subclass or implementer that ignores or overrides most of what it inherits. → drop the inheritance, use composition.
 
+<!-- factory:if subagents -->
 ### 4. Spawn both sub-agents in parallel
 
 Issue both sub-agent calls together, in the foreground, and aggregate the reports they return.
@@ -72,6 +88,15 @@ Issue both sub-agent calls together, in the foreground, and aggregate the report
 - The brief: "Report: (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words."
 
 If the spec is missing, skip the Spec sub-agent and note this in the final report.
+<!-- factory:else -->
+### 4. Review both axes yourself, one after the other
+
+**Standards pass.** Using the diff, the commit list, the standards-source files from step 3, and the smell baseline: report, per file/hunk where relevant, (a) every place the diff violates a documented standard, citing the standard (file + the rule); and (b) any baseline smell you spot, naming it and quoting the hunk. Distinguish hard violations from judgement calls: documented-standard breaches can be hard, but baseline smells are always judgement calls, and a documented repo standard overrides the baseline. Skip anything tooling enforces. Under 400 words.
+
+**Spec pass.** Then, setting the Standards findings aside, compare the diff with the spec: report (a) requirements the spec asked for that are missing or partial; (b) behaviour in the diff that wasn't asked for (scope creep); (c) requirements that look implemented but where the implementation looks wrong. Quote the spec line for each finding. Under 400 words.
+
+If the spec is missing, skip the Spec pass and note this in the final report.
+<!-- factory:end -->
 
 ### 5. Aggregate
 

@@ -1,0 +1,17 @@
+name = "when the hourly request budget is used up, the ticket is deferred, not failed"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+[settings.models.budgets]
+requests_per_hour = 1
+max_wait_seconds = 0
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["deferred"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "Ready for AI"
+lease_released = true
+labels_exclude = ["ai-failed"]
+comments_contain = ["Deferred", "the hourly budget of 1 model requests is used up"]

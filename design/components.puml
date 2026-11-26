@@ -23,8 +23,8 @@ package "factory.core" {
   [feedback: metrics, grading,\nself-improvement] as FEED
   [budget wrapper] as BUDGET
   [workspace isolator\n(policy applied, history replaced)] as ISO
+  [rules + skills renderer\n(capabilities: subagents, internet)\nCLAUDE.md / AGENTS.md / SKILL.md] as SK
   [model gateway (loopback)\nopenai_chat | anthropic_messages] as GW
-  [harness: builtin tool loop] as LOOP
   [harness: command (any CLI agent)] as CMD
   [harness: cli_agent\nclaude | codex | cline, direct or via jam] as CLIA
 }
@@ -92,16 +92,15 @@ COLLAB --> GitHost
 FEED --> TS
 FEED --> GitHost
 PIPE --> ISO
+PIPE --> SK
+SK --> EXT : native files in\nsandbox home
 ISO --> AccessGuard
 PIPE --> AgentHarness : run(task)
-LOOP ..|> AgentHarness
 CMD ..|> AgentHarness
 CLIA ..|> AgentHarness
 CLIA --> EXT : argv in Sandbox
 CMD --> EXT : argv in Sandbox
 EXT --> GW : only model route
-LOOP --> GW
-LOOP --> AccessGuard
 PIPE --> SKILLS : rendered into\ninstructions file
 GW --> BUDGET
 BUDGET --> ModelProvider

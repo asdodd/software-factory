@@ -11,9 +11,9 @@ class HarnessRuntime(Protocol):
     """What the factory lends a harness for one task.
 
     run: execute argv in the task's sandbox (cwd relative to the workspace).
-    guard: the per-run access guard; the builtin harness routes every tool
-      call through it. External harnesses cannot be made to, which is why
-      their workspace is isolated and their diff is checked afterwards.
+    guard: the per-run access guard, for filtering what the harness reports.
+      A CLI agent's own tools cannot be routed through it, which is why the
+      workspace is isolated and the diff is checked afterwards.
     max_denials: denied attempts after which a harness must stop."""
 
     guard: AccessGuard
@@ -24,8 +24,8 @@ class HarnessRuntime(Protocol):
 
 @runtime_checkable
 class AgentHarness(Protocol):
-    """The inner agent loop for a stage. Bring your own: the built-in tool loop,
-    or any CLI agent wrapped by the command adapter.
+    """The inner agent loop for a stage: a CLI agent (Claude Code, Codex, Cline,
+    directly or through jam), or any other CLI wrapped by the command adapter.
 
     A harness only edits files in task.workspace and talks to task.endpoint.
     Claiming, pushing, comments, gates, and trace upload stay in the factory,

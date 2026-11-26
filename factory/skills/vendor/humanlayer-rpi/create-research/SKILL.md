@@ -3,9 +3,16 @@ name: create-research
 description: Only use when the user explicitly invokes this skill by name.
 ---
 
+<!-- Modified by software-factory: passages that need sub-agents or internet access are wrapped in factory:if blocks with single-session and offline alternatives. Upstream text is otherwise unchanged; see factory/skills/vendor/SOURCES.toml for the source commit. -->
+
+
 # Research Codebase
 
+<!-- factory:if subagents -->
 You are tasked with conducting comprehensive research across the codebase to answer user questions by spawning parallel sub-agents and synthesizing their findings.
+<!-- factory:else -->
+You are tasked with conducting comprehensive research across the codebase to answer user questions, researching each area yourself and synthesizing your findings.
+<!-- factory:end -->
 
 ## CRITICAL: YOUR ONLY JOB IS TO DOCUMENT AND EXPLAIN THE CODEBASE AS IT EXISTS TODAY
 - DO NOT suggest improvements or changes unless the user explicitly asks for them
@@ -36,7 +43,11 @@ Then wait for the user's research query.
 1. **Read any directly mentioned files first:**
    - If the user mentions specific files (docs, JSON, research questions), read them FULLY first
    - **IMPORTANT**: Use the Read tool WITHOUT limit/offset parameters to read entire files
+<!-- factory:if subagents -->
    - **CRITICAL**: Read these files yourself in the main context before spawning any sub-tasks
+<!-- factory:else -->
+   - **CRITICAL**: Read these files yourself, in one batch of reads, before researching
+<!-- factory:end -->
    - **DO NOT read ticket files** - research must stay objective about the current codebase, not be influenced by what a ticket wants to build. The research questions already capture what needs to be investigated.
    - This ensures you have full context before decomposing the research
 
@@ -47,6 +58,7 @@ Then wait for the user's research query.
    - Create a research plan that tracks all subtasks
    - Consider which directories, files, or architectural patterns are relevant
 
+<!-- factory:if subagents -->
 3. **Spawn parallel sub-agent tasks for comprehensive research:**
    - Create multiple Task agents to research different aspects concurrently
    - Use only the specialized research agents listed below. Do not use other agent types, including `general-purpose`, `Explore`, or `Plan`.
@@ -80,6 +92,21 @@ Then wait for the user's research query.
    - Verify all rpi/ paths are correct (task-specific files go in .humanlayer/tasks/)
    - Highlight patterns, connections, and architectural decisions
    - Answer the user's specific questions with concrete evidence
+<!-- factory:else -->
+3. **Research the areas yourself, in this session:**
+   - Work through the research areas one after another; do not start sub-agents or Task agents.
+   - Group related questions that touch the same area of the codebase and answer them together.
+   - Batch your searches and file reads: issue several independent searches or reads in one turn rather than one per turn.
+   - Start by locating WHERE things live (search for names, routes, config keys), then read the most promising files to document HOW they work, then look for existing patterns to cite as examples.
+   - Use only the code and documents in the workspace; there is no web research.
+
+4. **Synthesize findings:**
+   - Prioritize live codebase findings as primary source of truth
+   - Connect findings across different components
+   - Include specific file paths and line numbers for reference
+   - Highlight patterns, connections, and architectural decisions
+   - Answer the specific questions with concrete evidence
+<!-- factory:end -->
 
 5. **Gather metadata for the research document:**
    - Filename: `.humanlayer/tasks/TASKNAME/NN-research-DESCRIPTION.md`
@@ -100,16 +127,26 @@ Then wait for the user's research query.
    - Write the document to `.humanlayer/tasks/TASKNAME/NN-research-DESCRIPTION.md`
 
 7. **Attempt to answer open questions**
+<!-- factory:if subagents -->
    - if there are open questions in the doc you write, dispatch subagents to additional targeted research AFTER you write the doc
    - update the doc with your findings, removing and open questions that now have answers - don't append to the end, 
    - do at most one additional pass to find more information, if your second group of subagents can't find all the answers, leave the remaining questions as open and proceed to the final answer 
+<!-- factory:else -->
+   - if there are open questions in the doc you write, do one more targeted research pass yourself AFTER you write the doc, batching the reads it needs
+   - update the doc with your findings, removing any open questions that now have answers - don't append to the end
+   - do at most one additional pass; leave anything still unanswered as an open question and proceed to the final answer
+<!-- factory:end -->
 
 8. **Note cloud permalinks:**
    Cloud permalinks are automatically provided when you write artifacts. Include them in your final output.
 
+<!-- factory:if internet -->
    For code references in the humanlayer repo (if on main or pushed):
    - Get repo info: `gh repo view --json owner,name`
    - Create permalinks: `https://github.com/{owner}/{repo}/blob/{commit}/{file}#L{line}`
+<!-- factory:else -->
+   Reference code as `path/to/file:line` relative to the repository root; do not create web permalinks.
+<!-- factory:end -->
 
 9. **Respond to the user according to the template**
    - Read the final output template:
@@ -118,7 +155,11 @@ Then wait for the user's research query.
 
 10. **Handle follow-up questions:**
    - If the user has follow-up questions for you to investigate
+<!-- factory:if subagents -->
    - Spawn new sub-agents as needed for additional investigation
+<!-- factory:else -->
+   - Investigate them yourself, batching the reads they need
+<!-- factory:end -->
    - Update the existing document in place with your new findings, likely you will update existing sections rather than adding net-new ones to the end
 
 ## Document Style and Format
@@ -240,21 +281,46 @@ Pick the views that make each part of the story clearest:
 
 <guidance>
 ## Important notes:
+<!-- factory:if subagents -->
 - Use parallel Task agents to maximize efficiency and minimize context usage
+<!-- factory:else -->
+- Work in one session without Task agents; batch independent reads and searches into the same turn
+<!-- factory:end -->
 - Focus on finding concrete file paths and line numbers for developer reference
 - Research documents should be self-contained with all necessary context
+<!-- factory:if subagents -->
 - Each sub-agent prompt should be specific and focused on read-only documentation operations
+<!-- factory:else -->
+- Keep the research read-only: document, do not change code
+<!-- factory:end -->
 - Document cross-component connections and how systems interact
+<!-- factory:if internet -->
 - Link to GitHub when possible for permanent references
+<!-- factory:else -->
+- Reference code by repository path and line number
+<!-- factory:end -->
 - Stay focused on synthesis, not deep file reading
+<!-- factory:if subagents -->
 - Have sub-agents document examples and usage patterns as they exist
+<!-- factory:else -->
+- Document examples and usage patterns as they exist
+<!-- factory:end -->
 - **REMEMBER**: Document and Ask about what IS and WHY, not what SHOULD BE
 - **NO RECOMMENDATIONS OR IMPLEMENTATION SUGGESTIONS**: Only describe the current state of the codebase
 - **Testing patterns**: For each component area you research, document how it's currently tested (unit, integration, e2e). Include test file locations and patterns. The research template has a "Testing patterns" section under each component - always fill it in.
+<!-- factory:if subagents -->
 - **File reading**: Always read mentioned files FULLY (no limit/offset) before spawning sub-tasks
+<!-- factory:else -->
+- **File reading**: Always read mentioned files FULLY (no limit/offset) before researching further
+<!-- factory:end -->
 - **Critical ordering**: Follow the numbered steps exactly
+<!-- factory:if subagents -->
   - ALWAYS read mentioned files first before spawning sub-tasks (step 1)
   - ALWAYS wait for all sub-agents to complete before synthesizing (step 4)
+<!-- factory:else -->
+  - ALWAYS read mentioned files first (step 1)
+  - ALWAYS finish researching every area before synthesizing (step 4)
+<!-- factory:end -->
   - ALWAYS gather metadata before writing the document (step 5 before step 6)
   - NEVER write the research document with placeholder values
 - **Path handling**: Task-specific research goes in .humanlayer/tasks/

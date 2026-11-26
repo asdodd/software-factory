@@ -3,6 +3,9 @@ name: implement-plan
 description: Only use when the user explicitly invokes this skill by name.
 ---
 
+<!-- Modified by software-factory: passages that need sub-agents or internet access are wrapped in factory:if blocks with single-session and offline alternatives. Upstream text is otherwise unchanged; see factory/skills/vendor/SOURCES.toml for the source commit. -->
+
+
 # Phased Implementation Orchestrator
 
 You are responsible for orchestrating the phased implementation of technical plans from `.humanlayer/tasks/`. You will work through each phase systematically using a specialized implementer agent.
@@ -15,6 +18,7 @@ For each phase in the implementation plan:
 If you were provided with a path to a plan file, proceed with the plan. 
 If you were provided with a task artifact directory like `.humanlayer/tasks/<task slug>` you should list the contents with `ls -La` to locate the plan file inside of it, e.g. `ls -La .humanlayer/tasks/<task slug>`. Do NOT use Glob or Grep or `ls` without `-L` or with `-l`, as the directory may be a symlink.
 
+<!-- factory:if subagents -->
 ### 1. Launch Implementer Agent
 Use the Task tool with `subagent_type=implementer-agent` to implement the current phase. Provide clear instructions about which phase to implement.
 
@@ -23,6 +27,10 @@ Example:
 Implement Phase [N] of the plan at .humanlayer/tasks/ENG-XXXX-description/NN-plan-DESCRIPTION.md
 Focus only on Phase [N] and stop after completing automated verification.
 ```
+<!-- factory:else -->
+### 1. Implement the Phase Yourself
+Implement the current phase directly in this session; do not launch an implementer agent or any sub-agent. Focus only on that phase, make its changes with as few edits as practical, and stop after its automated verification passes.
+<!-- factory:end -->
 
 IMPORTANT - keep your prompt short, do not duplicate details that are already in the plan, because the implementer agent will read the plan.
 
@@ -96,12 +104,21 @@ If instructed to implement multiple phases consecutively:
 Workflow checklist:
 
 - [ ] get plan path
+<!-- factory:if subagents -->
 - [ ] launch implementer subagent
 - [ ] review its work
+<!-- factory:else -->
+- [ ] implement the phase yourself
+- [ ] review your work against the phase's success criteria
+<!-- factory:end -->
 - [ ] ask the human to perform manual verification
 - [ ] iterate with the human until the results are satisfactory
 - [ ] commit the changes
+<!-- factory:if subagents -->
 - [ ] launch implementer subagent for next phase
+<!-- factory:else -->
+- [ ] continue with the next phase yourself
+<!-- factory:end -->
 
 ## After Final Phase Completion
 

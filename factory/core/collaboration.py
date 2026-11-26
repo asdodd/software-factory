@@ -252,7 +252,7 @@ def classify(w: Worker, ticket: Ticket, info: dict, body: str) -> tuple[str, str
     from factory.ports.types import CallContext
 
     stage = w.cfg.models.stages.respond
-    models = BudgetedModels(w.c.provider, w.accounting, w.clock, w.cfg.limits.max_tokens_per_ticket)
+    models = BudgetedModels.for_config(w.c.provider, w.accounting, w.clock, w.cfg)
     reporter = ticket.reporter.id if ticket.reporter else w.agent.service_account
     context = CallContext(w.name, ticket.key, "respond", reporter, w.agent.team)
     resp = models.complete(stage.provider, stage.model, (

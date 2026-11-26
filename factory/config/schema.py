@@ -132,6 +132,7 @@ class LimitsConfig:
     max_files_changed: int = 15
     max_diff_lines: int = 600
     max_denied_access_attempts: int = 5
+    max_requests_per_ticket: int = 400
     max_ticket_chars: int = 12000
     max_acceptance_criteria: int = 12
 
@@ -332,7 +333,7 @@ class StageModel:
 class StageModels:
     triage: StageModel = field(default_factory=StageModel)
     spec: StageModel = field(default_factory=StageModel)
-    implement: StageModel = field(default_factory=lambda: StageModel(harness="builtin"))
+    implement: StageModel = field(default_factory=StageModel)
     review: StageModel = field(default_factory=StageModel)
     intake: StageModel = field(default_factory=StageModel)
     grading: StageModel = field(default_factory=StageModel)
@@ -342,10 +343,15 @@ class StageModels:
 
 @dataclass(frozen=True)
 class BudgetsConfig:
+    """Token budgets per day, and request budgets for request-limited endpoints.
+    requests_per_hour counts every model request through the factory; when the
+    window is full, calls wait up to max_wait_seconds for room, then fail."""
+
     user_tokens_per_day: int = 0
     team_tokens_per_day: int = 0
     agent_tokens_per_day: int = 0
-    requests_per_minute: int = 0
+    requests_per_hour: int = 0
+    max_wait_seconds: int = 600
 
 
 @dataclass(frozen=True)
@@ -412,6 +418,15 @@ class FeedbackConfig:
 
 
 @dataclass(frozen=True)
+class CapabilitiesConfig:
+    """What the agent environment allows. Skills, base rules, and CLI flags are
+    rendered to match (see factory/core/conditional.py)."""
+
+    subagents: bool = False
+    internet: bool = False
+
+
+@dataclass(frozen=True)
 class SkillRef:
     """A stage skill by id ("<pack>/<name>"), optionally conditional on the
     ticket's issue type or on an approved spec existing."""
@@ -439,7 +454,7 @@ class SkillsConfig:
     stages: StageSkills = field(default_factory=StageSkills)
     extra_paths: list[str] = field(default_factory=list)
     max_chars_per_stage: int = 60000
-    install_native: bool = True
+    delivery: Literal["native", "inline"] = "native"
 
 
 @dataclass(frozen=True)
@@ -495,6 +510,7 @@ class FactoryConfig:
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
     skills: SkillsConfig = field(default_factory=SkillsConfig)
+    capabilities: CapabilitiesConfig = field(default_factory=CapabilitiesConfig)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -532,6 +548,7 @@ class AgentOverrides:
     models: dict[str, object] = field(default_factory=dict)
     gates: dict[str, object] = field(default_factory=dict)
     skills: dict[str, object] = field(default_factory=dict)
+    capabilities: dict[str, bool] = field(default_factory=dict)
     features: dict[str, bool] = field(default_factory=dict)
 
 

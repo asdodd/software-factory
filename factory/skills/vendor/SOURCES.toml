@@ -1,6 +1,7 @@
-# Third-party skills vendored unmodified. Update by re-copying from the pinned
-# commit; never edit these files in place (factory adaptations live in
-# factory/skills/adapter.md, which is rendered ahead of them).
+# Third-party skills, vendored from the pinned commits below. Files listed under
+# `modified` carry factory:if blocks (see factory/core/conditional.py) so their
+# sub-agent and online passages can be switched by [capabilities]; each such file
+# begins with a modification notice. Everything else is unchanged upstream text.
 
 [mattpocock]
 repo = "https://github.com/mattpocock/skills"
@@ -8,8 +9,12 @@ commit = "6f7f7831a625f040a8e06a0e7954826b87ce775a"
 license = "MIT"
 license_file = "mattpocock/LICENSE"
 skills = ["tdd", "code-review", "codebase-design", "diagnosing-bugs", "pr", "retro", "to-spec",
-          "improve-codebase-architecture", "software-factory"]
-paths = "skills/engineering/<name> (software-factory: skills/in-progress/software-factory)"
+          "improve-codebase-architecture"]
+paths = "skills/engineering/<name>"
+modified = ["code-review/SKILL.md", "codebase-design/SKILL.md", "codebase-design/DESIGN-IT-TWICE.md",
+            "improve-codebase-architecture/SKILL.md"]
+modification = "Sub-agent and online passages wrapped in factory:if blocks with single-session and offline alternatives."
+moved = "software-factory moved to factory/skills/vendor-online (needs internet)"
 excluded = "scripts/ directories (executable helpers are not vendored)"
 notes = "pr/CREDITS.md credits Dex Horthy's show-me skill (humanlayer/humanlayer) for its Summary section."
 
@@ -21,3 +26,5 @@ license_file = "humanlayer-rpi/LICENSE"
 notice_file = "humanlayer-rpi/NOTICE"
 skills = ["create-plan", "implement-plan", "create-research-questions", "create-research"]
 paths = "apps/riptide-rpi-claude-plugin/skills/<name>"
+modified = ["create-research/SKILL.md", "implement-plan/SKILL.md"]
+modification = "Sub-agent and online passages wrapped in factory:if blocks with single-session and offline alternatives (Apache-2.0 section 4(b): modified files carry a notice)."

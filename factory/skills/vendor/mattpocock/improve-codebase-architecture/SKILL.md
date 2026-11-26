@@ -4,6 +4,9 @@ description: Scan a codebase for deepening opportunities, present them as a visu
 disable-model-invocation: true
 ---
 
+<!-- Modified by software-factory: passages that need sub-agents or internet access are wrapped in factory:if blocks with single-session and offline alternatives. Upstream text is otherwise unchanged; see factory/skills/vendor/SOURCES.toml for the source commit. -->
+
+
 # Improve Codebase Architecture
 
 Surface architectural friction and propose **deepening opportunities**: refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
@@ -24,7 +27,11 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 Read the project's domain glossary (`GLOSSARY.md`) and any ADRs in the area you're touching first.
 
+<!-- factory:if subagents -->
 Then spawn a sub-agent with a fresh context window to walk the codebase. Don't follow rigid heuristics; explore organically and note where you experience friction:
+<!-- factory:else -->
+Then walk the codebase yourself, batching your reads. Don't follow rigid heuristics; explore organically and note where you experience friction:
+<!-- factory:end -->
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow**, with an interface nearly as complex as the implementation?
@@ -34,6 +41,7 @@ Then spawn a sub-agent with a fresh context window to walk the codebase. Don't f
 
 Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
 
+<!-- factory:if internet -->
 ### 2. Present candidates as an HTML report
 
 Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user (`xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows) and tell them the absolute path.
@@ -58,6 +66,13 @@ End the report with a **Top recommendation** section: which candidate you'd tack
 See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
 
 Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+<!-- factory:else -->
+### 2. Present candidates as a Markdown report
+
+Write the candidates as a self-contained Markdown report (no HTML, no external scripts or stylesheets): one section per candidate with the files involved, why it is shallow, what deepening would concentrate, and a plain-text or Mermaid sketch. Put it under the working-notes directory if one is given, otherwise in your final summary.
+
+Do NOT propose interfaces yet.
+<!-- factory:end -->
 
 ### 3. Grilling loop
 
@@ -68,4 +83,8 @@ Side effects happen inline as decisions crystallize; call the Skill tool with "d
 - **Naming a deepened module after a concept not in `GLOSSARY.md`?** Add the term to `GLOSSARY.md`. Create the file lazily if it doesn't exist.
 - **Sharpening a fuzzy term during the conversation?** Update `GLOSSARY.md` right there.
 - **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing; skip ephemeral reasons ("not worth it right now") and self-evident ones.
+<!-- factory:if subagents -->
 - **Want to explore alternative interfaces for the deepened module?** Call the Skill tool with "codebase-design" and use its design-it-twice parallel sub-agent pattern.
+<!-- factory:else -->
+- **Want to explore alternative interfaces for the deepened module?** Use the "codebase-design" skill's design-it-twice pattern, producing the designs yourself.
+<!-- factory:end -->

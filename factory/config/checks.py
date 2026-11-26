@@ -27,7 +27,6 @@ MODEL_STAGES = {
 ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source",
                 "notifier")
 FEATURE_PORTS = {"mailbox": ("intake.email",), "monitor": ("intake.monitoring", "monitoring")}
-TOOL_LOOP_HARNESSES = frozenset({"harness.builtin"})
 
 
 def effective_rule(config: FactoryConfig, channel: str) -> CommenterRule:
@@ -142,7 +141,7 @@ def _check_harness(prefix: str, name: str, cfg: FactoryConfig, out: list) -> Non
     if needed and needed not in cfg.gateway.dialects:
         out.append(Diagnostic("error", f"{prefix}harness {name!r} needs gateway dialect {needed}; "
                                        "add it to gateway.dialects"))
-    if cfg.access_policy.mode == "deny_read" and h.adapter not in TOOL_LOOP_HARNESSES and not _sandbox_hides_paths(cfg):
+    if cfg.access_policy.mode == "deny_read" and not _sandbox_hides_paths(cfg):
         out.append(Diagnostic(
             "error",
             f"{prefix}access_policy.mode = deny_read cannot be enforced for harness {name!r}; "

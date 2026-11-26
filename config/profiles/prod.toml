@@ -112,7 +112,7 @@ model = ""
 [models.stages.implement]
 provider = "primary"
 model = ""
-harness = "builtin"
+harness = "claude"
 [models.stages.review]
 provider = "primary"
 model = ""

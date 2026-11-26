@@ -1,0 +1,11 @@
+# Skills that only make sense with internet access. They are loaded only when
+# capabilities.internet is true. Vendored unmodified.
+
+[mattpocock]
+repo = "https://github.com/mattpocock/skills"
+commit = "6f7f7831a625f040a8e06a0e7954826b87ce775a"
+license = "MIT"
+license_file = "mattpocock/LICENSE"
+skills = ["software-factory"]
+paths = "skills/in-progress/software-factory"
+reason = "Its reference files are surveys of online products, and it tells the agent to research current options on the web."

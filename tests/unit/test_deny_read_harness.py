@@ -24,7 +24,7 @@ def test_deny_read_with_external_harness_is_a_startup_error(tmp_path):
         load(root, env={}, extra_layers=[Layer("scenario", BYO)])
 
 
-def test_deny_read_with_builtin_harness_is_allowed(tmp_path):
+def test_deny_read_with_a_path_hiding_sandbox_is_allowed(tmp_path):
     root = deny_read_root(tmp_path)
-    builtin = {"models": {"stages": {"implement": {"provider": "scripted", "model": "m", "harness": "builtin"}}}}
-    assert load(root, env={}, extra_layers=[Layer("scenario", builtin)]).config.access_policy.mode == "deny_read"
+    hiding = {**BYO, "plugins": {"sandbox": {"adapter": "tests.fixtures.hiding_sandbox:HidingSandbox"}}}
+    assert load(root, env={}, extra_layers=[Layer("scenario", hiding)]).config.access_policy.mode == "deny_read"

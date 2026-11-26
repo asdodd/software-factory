@@ -39,6 +39,10 @@ class MemoryAccounting:
                 total += r.usage.total
         return total
 
+    def request_count(self, scope: SpendScope | None = None, since: datetime | None = None) -> int:
+        return sum(1 for r in self.records if (since is None or r.at >= since)
+                   and (scope is None or _scope_ids(r.context)[scope.kind] == scope.id))
+
     def check(self, context: CallContext, estimated_tokens: int) -> BudgetDecision:
         since = self._clock.now() - timedelta(days=1)
         for kind, limit in self._limits.items():

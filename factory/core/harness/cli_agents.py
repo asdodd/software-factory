@@ -35,6 +35,7 @@ MAX_ARG_PROMPT = 100_000
 
 FOOTER = (
     "\n\n## Reporting\nWork only inside the current directory. Do not commit, push, or contact any service. "
+    "Requests are limited: batch independent tool calls and do not start sub-agents unless your rules allow it. "
     "When you are done, end your final message with exactly one line of JSON: "
     '{"status": "done" | "needs_info" | "blocked" | "failed", "summary": "<one paragraph>", '
     '"questions": ["<numbered questions when status is needs_info>"]}\n'
@@ -149,12 +150,25 @@ class CliAgentHarness:
         return {"claude": (".claude/skills",), "codex": (".codex/skills",)}.get(self.agent, ())
 
     @property
+    def native_memory_file(self) -> str:
+        """The global instructions file this CLI reads at start, relative to its home."""
+        return {"claude": ".claude/CLAUDE.md", "codex": ".codex/AGENTS.md",
+                "cline": "Documents/Cline/Rules/software-factory.md"}.get(self.agent, "")
+
+    def capability_args(self, capabilities: Mapping[str, bool]) -> tuple[str, ...]:
+        """Mechanical brakes where the CLI offers them, on top of the written rules."""
+        if self.agent == "claude" and not capabilities.get("subagents", False):
+            return ("--disallowedTools", "Task")
+        return ()
+
+    @property
     def dialect(self) -> str:
         return self.preset.dialect
 
-    def argv(self, values: Mapping[str, str]) -> tuple[str, ...]:
+    def argv(self, values: Mapping[str, str], capabilities: Mapping[str, bool] | None = None) -> tuple[str, ...]:
         head = [self.jam_executable, self.jam_name] if self.launcher == "jam" else [self.executable]
-        return tuple(_fill(a, values) for a in (*head, *self.args, *self.extra_args))
+        extra = self.capability_args(capabilities or {})
+        return tuple(_fill(a, values) for a in (*head, *self.args, *extra, *self.extra_args))
 
     def run(self, task: HarnessTask, runtime: HarnessRuntime) -> HarnessResult:
         if self.dialect not in task.endpoint.dialects:
@@ -174,7 +188,7 @@ class CliAgentHarness:
             "gateway_token": task.endpoint.token, "model": task.endpoint.model, "max_turns": str(task.max_turns),
             "prompt_file": str(prompt_file), "output_file": str(output_file), "prompt": arg_prompt,
         }
-        command = Command(self.argv(values), ".", {k: _fill(v, values) for k, v in self.env.items()},
+        command = Command(self.argv(values, task.capabilities), ".", {k: _fill(v, values) for k, v in self.env.items()},
                           task.timeout_seconds, str(prompt_file) if self.preset.prompt_via == "stdin" else "")
         result = runtime.run(command)
         if result.timed_out:

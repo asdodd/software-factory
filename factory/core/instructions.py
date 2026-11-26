@@ -4,27 +4,20 @@ global process rules are always included and cannot be removed."""
 from __future__ import annotations
 
 from collections.abc import Sequence
-from functools import cache
-from pathlib import Path
 
 from factory.config.schema import FactoryConfig, RepoRules
+from factory.core import skills
 from factory.core.readiness import text_field
 from factory.ports.types import Ticket
-
-SKILLS = Path(__file__).resolve().parents[1] / "skills"
-
-
-@cache
-def base_skills() -> str:
-    return "\n\n".join(p.read_text().strip() for p in sorted((SKILLS / "base").glob("*.md")))
 
 
 def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequence[tuple[str, str]],
            spec: str = "", feedback: Sequence[str] = (), withheld_attachments: int = 0,
-           attachments_dir: str = "", answers: Sequence[str] = (), skills_text: str = "") -> str:
+           attachments_dir: str = "", answers: Sequence[str] = (), skills_text: str = "",
+           rules_text: str | None = None) -> str:
     parts = [
         "# Factory task",
-        base_skills(),
+        skills.base_rules(skills.capabilities(cfg)) if rules_text is None else rules_text,
         "## Limits",
         f"- At most {cfg.limits.max_files_changed} files changed and {cfg.limits.max_diff_lines} diff lines.",
         "- The change is checked by mechanical gates: lint, tests, protected paths, access policy, and size.",

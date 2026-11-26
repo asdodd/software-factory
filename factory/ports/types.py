@@ -435,6 +435,7 @@ class Outcome(enum.Enum):
     FIX_PUSHED = "fix_pushed"
     FIX_FAILED = "fix_failed"
     REPLIED = "replied"
+    DEFERRED = "deferred"
     BRANCH_PUSHED = "branch_pushed"
     NEEDS_INFO = "needs_info"
     BLOCKED = "blocked"
@@ -458,6 +459,7 @@ class RunMeta:
     stage_seconds: Mapping[str, float]
     usage: Usage
     outcome: Outcome | None
+    requests: int = 0
 
 
 @dataclass(frozen=True)
@@ -559,6 +561,7 @@ class HarnessTask:
     endpoint: ModelEndpoint
     timeout_seconds: float
     max_turns: int
+    capabilities: Mapping[str, bool] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
