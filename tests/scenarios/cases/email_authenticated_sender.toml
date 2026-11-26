@@ -1,0 +1,32 @@
+name = "with require_authenticated_sender, an allowlisted address counts only with dkim/dmarc pass"
+include = ["_common.toml"]
+[overrides]
+enable = ["intake.email", "intake.email.auto_label"]
+[settings.intake.email]
+require_authenticated_sender = true
+
+[[model]]
+stage = "intake"
+ticket = "email:t-1"
+content = { summary = "Add multiply to calc", repo = "web/portal", acceptance_criteria = ["multiply works"] }
+[[model]]
+stage = "intake"
+ticket = "email:t-2"
+content = { summary = "Add divide to calc", repo = "web/portal", acceptance_criteria = ["divide works"] }
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "spoofed?", body = "Please add multiply.", thread = "t-1" }
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "real", body = "Please add divide.", thread = "t-2", headers = { "Authentication-Results" = "mx.sim.invalid; dkim=pass header.d=sim.invalid" } }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 2
+[[expect.tickets]]
+key = "SIM-1"
+labels_exclude = ["ai-ready"]
+comments_contain = ["the sender is not trusted"]
+[[expect.tickets]]
+key = "SIM-2"
+labels_include = ["ai-ready"]

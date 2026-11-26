@@ -1,0 +1,23 @@
+name = "a regression finding becomes a ready, routed ticket and an MR"
+include = ["_common.toml", "_monitoring.toml", "_good_change.toml"]
+agent_files = ["agents/alpha-bot.toml"]
+[overrides]
+enable = ["intake.routing"]
+[settings.intake.monitoring]
+auto_label = true
+[settings.intake.routing]
+rules = [{ agent = "alpha-bot", repos = ["web/portal"] }]
+
+[[steps]]
+monitor_finding = { id = "reg-1", source = "regression", repo = "web/portal", location = "src/calc.py", summary = "multiply is missing", severity = "critical" }
+[[steps]]
+intake_poll = true
+[[steps]]
+run = "alpha-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-ready"]
+status = "In Review"

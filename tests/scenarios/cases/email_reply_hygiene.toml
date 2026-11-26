@@ -1,0 +1,34 @@
+name = "replies go to the sender and thread participants, but only the sender for lists or large threads"
+include = ["_common.toml"]
+[overrides]
+enable = ["intake.email"]
+[settings.intake.email]
+max_reply_recipients = 4
+
+[[model]]
+stage = "intake"
+ticket = "email:t-small"
+content = { summary = "Small thread request", repo = "web/portal", acceptance_criteria = ["x"] }
+[[model]]
+stage = "intake"
+ticket = "email:t-big"
+content = { summary = "Big thread request", repo = "web/portal", acceptance_criteria = ["y"] }
+[[model]]
+stage = "intake"
+ticket = "email:t-list"
+content = { summary = "List request", repo = "web/portal", acceptance_criteria = ["z"] }
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "small", body = "a", thread = "t-small", cc = ["bob@sim.invalid", "noreply@sim.invalid"] }
+[[steps]]
+email = { from = "bob@sim.invalid", subject = "big", body = "b", thread = "t-big", cc = ["c1@sim.invalid", "c2@sim.invalid", "c3@sim.invalid", "c4@sim.invalid", "c5@sim.invalid"] }
+[[steps]]
+email = { from = "carol@sim.invalid", subject = "list", body = "c", thread = "t-list", cc = ["dev@sim.invalid"], headers = { "List-Id" = "dev.sim.invalid" } }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 3
+[expect.email]
+replies = 3
+reply_cc = ["bob@sim.invalid"]

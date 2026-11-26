@@ -1,0 +1,2 @@
+[overrides]
+enable = ["intake.gitlab_comments"]

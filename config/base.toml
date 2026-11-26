@@ -41,6 +41,7 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "notifier.fake"          = "factory.adapters.fake.notifier:FakeNotifier"
 "notifier.ticket_comment" = "factory.core.notify:TicketCommentNotifier"
 "monitor.fake"           = "factory.adapters.fake.monitor:FakeMonitor"
+"monitor.command"        = "factory.core.monitors:CommandMonitor"
 "accounting.memory"      = "factory.adapters.fake.accounting:MemoryAccounting"
 "accounting.sqlite"      = "factory.adapters.models.sqlite_accounting:SqliteAccounting"
 "state_store.memory"     = "factory.adapters.fake.state_store:MemoryStateStore"
@@ -58,6 +59,7 @@ adapter = "access_guard.policy"   # the only guard; not swappable per profile in
 # Profiles fill these in; they are left empty here on purpose.
 [workflow]
 claim_from = ["ready"]
+ticket_url_template = ""                 # e.g. "https://jira.internal/browse/{key}"; used in replies
 # [workflow.statuses]   ready = "...", in_progress = "...", spec_review = "...",
 #                       in_review = "...", needs_info = "...", blocked = "...",
 #                       stalled = "...", failed = "...", done = "..."
@@ -157,12 +159,24 @@ mode = "strip"                           # strip | deny_read
 
 [intake]
 dedupe_window_days = 90
+override_window_days = 14                # how long human overrides of intake verdicts are tracked
 [intake.email]
+address = ""                             # the bot's mailbox; mail is read only when it is in To or Cc
 allow_updates = false                    # email never updates tickets or agent context
 auto_label = false                       # false = draft-only, a human applies the label
-allowlisted_senders = []
+allowlisted_senders = []                 # wildcards allowed: "*@team.example"
+require_authenticated_sender = false     # true: allowlist counts only with dkim/dmarc pass in Authentication-Results
+user_map = {}                            # "alice@team.example" = "alice"
+max_reply_recipients = 10                # more than this, or a mailing list: reply to the sender only
+max_attachment_bytes = 200000
 [intake.gitlab]
-keyword = "/followup"
+keyword = "/followup"                    # first word of an MR or issue comment
+auto_label = false                       # false = draft-only, a human applies the label
+allowed_authors = []
+reply = true                             # reply in the thread with the new ticket
+[intake.monitoring]
+auto_label = false                       # monitors are trusted; false = draft-only
+min_severity = "medium"                  # info | low | medium | high | critical
 [intake.routing]
 enabled = false
 rules = []                               # [{agent = "docs-bot", components = ["docs"]}]
@@ -193,6 +207,9 @@ model = ""
 provider = ""
 model = ""
 [models.stages.respond]                  # classifies and answers MR comments
+provider = ""
+model = ""
+[models.stages.improve]                  # drafts self-improvement proposals
 provider = ""
 model = ""
 [models.budgets]                         # 0 = no limit at this scope
@@ -255,6 +272,19 @@ settings = { agent = "codex", launcher = "jam" }
 bind_host = "127.0.0.1"
 dialects = ["openai_chat", "anthropic_messages"]
 request_timeout_seconds = 300
+
+# Feedback loop, in order: metrics, traces, grading, self-improvement (each behind its feature).
+[feedback.grading]
+lookback_days = 7
+max_runs_per_job = 200
+min_agreement = 0.8                      # grader must agree with human labels this often before it is trusted
+tolerance = 1                            # a score within this of the human's counts as agreement
+[feedback.self_improvement]
+repo = ""                                # the factory repo on the git host; proposals open MRs there
+base_branch = "main"
+allowed_paths = ["factory/skills/**", "config/agents/**"]
+max_files = 10
+lookback_days = 14
 
 # Who is alerted, by user id (the ticket reporter is added when include_reporter is true).
 [notifications]

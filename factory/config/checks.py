@@ -18,9 +18,10 @@ MODEL_STAGES = {
     "spec": ("spec",),
     "implement": ("implement",),
     "review": ("review",),
-    "intake": ("intake.email", "intake.gitlab_comments"),
+    "intake": ("intake.email",),
     "grading": ("feedback.grading",),
     "respond": ("mr.respond", "mr.auto_fix"),
+    "improve": ("feedback.self_improvement",),
 }
 
 ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source",
@@ -212,6 +213,8 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
         if ts.s3.encryption.mode == "sse-kms" and not ts.s3.encryption.kms_key_id:
             out.append(Diagnostic("error", "trace_store.s3.encryption.kms_key_id is required for sse-kms"))
 
+    if loaded.features.on("feedback.self_improvement") and not cfg.feedback.self_improvement.repo:
+        out.append(Diagnostic("error", "feedback.self_improvement.repo is required when self-improvement is on"))
     if not cfg.access_policy.enabled:
         out.append(Diagnostic("alert", "access_policy.enabled is false: the no-proprietary-files base skill is NOT enforced"))
     if cfg.intake.email.allow_updates:

@@ -475,6 +475,9 @@ class OutcomeRecord:
     at: datetime
     kind: str
     payload: Mapping[str, object]
+    agent: str = ""
+    ticket_key: TicketKey = ""
+    run_started: datetime | None = None
 
 
 @dataclass(frozen=True)

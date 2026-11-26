@@ -4,7 +4,9 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from factory.adapters.fake.s3 import READ_ONLY, WRITE_ONLY, FakeS3
 from factory.adapters.trace.objects import LocalFsBackend, MemoryBackend, ObjectTraceStore
+from factory.adapters.trace.s3 import S3Backend
 from factory.core.trace_writers import write_only
 from factory.metrics import Metrics
 from factory.ports.types import Artifact, Outcome, OutcomeRecord, RunMeta, TraceEvent, TraceQuery, Usage
@@ -13,8 +15,19 @@ TEMPLATE = "{prefix}{agent}/{yyyy}/{mm}/{dd}/{ticket_key}/{run_id}/"
 T0 = datetime(2026, 3, 2, 10, 0, tzinfo=UTC)
 
 
-@pytest.fixture(params=["memory", "local_fs"])
+def s3_store(tmp_path, fake=None, page_size=2):
+    fake = fake or FakeS3()
+    fake.bucket.page_size = page_size
+    enc = {"ServerSideEncryption": "aws:kms", "SSEKMSKeyId": "key-1"}
+    write = S3Backend(fake.client(WRITE_ONLY), "traces", enc, sleep=lambda s: None)
+    read = S3Backend(fake.client(READ_ONLY), "traces", enc, sleep=lambda s: None)
+    return ObjectTraceStore(write, "factory-traces/", TEMPLATE, Metrics(), "full", tmp_path / "retry", read_backend=read)
+
+
+@pytest.fixture(params=["memory", "local_fs", "s3"])
 def store(request, tmp_path):
+    if request.param == "s3":
+        return s3_store(tmp_path)
     backend = MemoryBackend() if request.param == "memory" else LocalFsBackend(tmp_path / "traces")
     return ObjectTraceStore(backend, "factory-traces/", TEMPLATE, Metrics(), "full", tmp_path / "retry")
 
@@ -32,22 +45,27 @@ def test_put_get_roundtrip_with_layout(store, tmp_path):
     got, events, outcomes = store.get("run-1")
     assert got.ticket_key == "SIM-1" and got.outcome is Outcome.MR_OPENED and got.usage.total == 15
     assert [e.kind for e in events] == ["model_call"] and outcomes == ()
-    keys = store.backend.list("factory-traces/frontend-bot/2026/03/02/SIM-1/run-1/")
+    keys = store.read_backend.list("factory-traces/frontend-bot/2026/03/02/SIM-1/run-1/")
     assert {k.rsplit("/", 1)[-1] for k in keys} >= {"meta.json", "trace.jsonl.gz", "diff.patch"}
 
 
 def test_outcomes_are_new_objects_never_overwrites(store):
     store.put_run(meta(), [], [])
     store.flush()
-    before = set(store.backend.list(""))
+    before = set(store.read_backend.list(""))
     store.append_outcome(OutcomeRecord("run-1", T0 + timedelta(days=1), "merged", {"by": "bob"}))
     store.append_outcome(OutcomeRecord("run-1", T0 + timedelta(days=2), "grade", {"score": 4}))
     store.flush()
-    after = set(store.backend.list(""))
+    after = set(store.read_backend.list(""))
     assert before < after and len(after - before) == 2
     assert [o.kind for o in store.get("run-1")[2]] == ["merged", "grade"]
-    with pytest.raises((FileExistsError, OSError)):
-        store.backend.put(sorted(before)[0], b"overwrite")
+    key = sorted(before)[0]
+    original = store.read_backend.get(key)
+    try:
+        store.backend.put(key, b"overwrite")
+    except (FileExistsError, OSError):
+        pass
+    assert store.read_backend.get(key) == original
 
 
 def test_list_filters_by_agent_date_ticket_outcome(store):
@@ -90,3 +108,68 @@ def test_agent_writer_cannot_read_list_or_delete(store):
     assert {n for n in dir(writer) if not n.startswith("_")} == {"put_run", "append_outcome", "flush"}
     with pytest.raises(AttributeError):
         writer.store = store
+
+
+def test_outcome_from_write_only_credentials_needs_no_read(tmp_path):
+    fake = FakeS3()
+    agent = s3_store(tmp_path, fake)
+    agent.put_run(meta(), [], [])
+    agent.flush()
+    later = s3_store(tmp_path / "later", fake)
+    later.append_outcome(OutcomeRecord("run-1", T0 + timedelta(days=1), "mr_merged", {}, "frontend-bot", "SIM-1", T0))
+    later.flush()
+    assert [o.kind for o in later.get("run-1")[2]] == ["mr_merged"]
+
+
+def test_s3_write_credentials_cannot_read_and_read_credentials_cannot_write(tmp_path):
+    fake = FakeS3()
+    store = s3_store(tmp_path, fake)
+    store.put_run(meta(), [], [])
+    store.flush()
+    with pytest.raises(Exception, match="AccessDenied"):
+        store.backend.get(next(iter(fake.bucket.objects)))
+    with pytest.raises(Exception, match="AccessDenied"):
+        store.backend.list("")
+    with pytest.raises(Exception, match="AccessDenied"):
+        store.read_backend.put("factory-traces/x", b"y")
+
+
+def test_s3_encryption_is_sent_and_required(tmp_path):
+    fake = FakeS3()
+    store = s3_store(tmp_path, fake)
+    store.put_run(meta(), [], [])
+    store.flush()
+    assert all(e["ServerSideEncryption"] == "aws:kms" and e["SSEKMSKeyId"] == "key-1"
+               for e in fake.bucket.encryption.values())
+    plain = S3Backend(fake.client(WRITE_ONLY), "traces", {}, sleep=lambda s: None)
+    with pytest.raises(Exception, match="AccessDenied"):
+        plain.put("factory-traces/unencrypted", b"x")
+
+
+def test_s3_throttling_retries_and_partial_failure_queues(tmp_path):
+    fake = FakeS3()
+    store = s3_store(tmp_path, fake)
+    fake.bucket.throttle_next = 3
+    store.put_run(meta("r1"), [], [])
+    store.flush()
+    assert store.pending == 0
+    fake.bucket.fail_next_puts = 2
+    store.put_run(meta("r2"), [], [])
+    store.flush()
+    assert store.pending == 0, "transient 5xx errors are retried with backoff"
+    fake.bucket.fail_next_puts = 1000
+    store.put_run(meta("r3"), [], [])
+    store.flush()
+    assert store.pending == 3 and store.metrics.count("trace_upload_failures") == 3  # meta, trace, manifest
+    fake.bucket.fail_next_puts = 0
+    store.flush()
+    assert store.pending == 0 and store.get("r3")[0].run_id == "r3"
+
+
+def test_s3_backend_refuses_missing_endpoint_or_encryption(tmp_path):
+    from factory.adapters.trace.s3 import S3ConfigError, encryption_args
+    from factory.config.schema import S3Config, S3Encryption
+    with pytest.raises(S3ConfigError, match="encryption.mode is required"):
+        encryption_args(S3Config(encryption=S3Encryption(mode="")), required=True)
+    assert encryption_args(S3Config(encryption=S3Encryption(mode="sse-s3")), required=True) == {
+        "ServerSideEncryption": "AES256"}

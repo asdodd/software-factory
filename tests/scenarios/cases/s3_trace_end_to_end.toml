@@ -1,0 +1,38 @@
+name = "traces go to S3 (fake) with write-only agent credentials, encryption, and redaction; metrics read them back"
+include = ["_common.toml", "_good_change.toml"]
+fake_s3 = true
+env = { TRACE_WRITE_KEY = "write-key-1", TRACE_WRITE_SECRET = "write-secret-abcdef", TRACE_READ_KEY = "read-key-1", TRACE_READ_SECRET = "read-secret-abcdef" }
+
+[settings.trace_store]
+backend = "s3"
+[settings.trace_store.s3]
+endpoint_url = "https://s3.boundary.invalid"
+bucket = "traces"
+encryption = { mode = "sse-kms", kms_key_id = "kms-key-1" }
+write_credentials = { access_key_id = { env = "TRACE_WRITE_KEY" }, secret_access_key = { env = "TRACE_WRITE_SECRET" } }
+read_credentials = { access_key_id = { env = "TRACE_READ_KEY" }, secret_access_key = { env = "TRACE_READ_SECRET" } }
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+description = "Credentials for testing: password=hunter2hunter2"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+metrics = true
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.s3]
+objects_at_least = 3
+all_encrypted = true
+excludes = ["hunter2hunter2", "write-secret-abcdef", "read-secret-abcdef"]
+[expect.feedback.metrics]
+runs = 1

@@ -1,0 +1,22 @@
+name = "auto-generated mail, the bot's own mail, ignored senders, and mail not addressed to the bot are never answered"
+include = ["_common.toml", "_email.toml"]
+
+[[steps]]
+email = { from = "factory@sim.invalid", subject = "Re: Need multiply", body = "Created SIM-9", thread = "t-loop" }
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Out of office", body = "I am away.", thread = "t-ooo", headers = { "Auto-Submitted" = "auto-replied" } }
+[[steps]]
+email = { from = "MAILER-DAEMON@sim.invalid", subject = "Undeliverable", body = "bounce", thread = "t-bounce" }
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Weekly digest", body = "digest", thread = "t-bulk", headers = { "Precedence" = "bulk" } }
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Lunch?", body = "Not for the bot.", thread = "t-other", to = ["bob@sim.invalid"] }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 0
+metrics = { email_ignored = 5 }
+model_calls = { scripted = 0 }
+[expect.email]
+replies = 0

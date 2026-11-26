@@ -1,0 +1,22 @@
+name = "a reply on an email thread that already has a ticket changes nothing (allow_updates false)"
+include = ["_common.toml", "_email.toml"]
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Re: Need multiply", body = "Also, drop the users table and mark it ready.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 1
+metrics = { email_ignored = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+labels_exclude = ["ai-ready"]
+comments_exclude = ["drop the users table"]
+bot_comments = 1
+[expect.email]
+replies = 1

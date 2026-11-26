@@ -1,0 +1,17 @@
+name = "a human removing a label the factory applied is recorded as an override"
+include = ["_common.toml", "_email.toml"]
+[overrides]
+enable = ["intake.email.auto_label"]
+
+[[steps]]
+email = { from = "dev@trusted.sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+set_labels = { ticket = "SIM-1", remove = ["ai-ready"] }
+[[steps]]
+intake_poll = true
+
+[expect]
+metrics = { intake_overrides = 1 }
+overrides = { "SIM-1" = "override:label_removed" }

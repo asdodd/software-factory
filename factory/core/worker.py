@@ -680,7 +680,7 @@ class _Run:
                              author_email=f"{account}@factory.invalid", allow_protocols="file"))
         git.run(["checkout", "-q", "-B", branch], cwd=self.clone_root)
         paths = workspace.apply(found, copy, self.clone_root)
-        git.run(["add", "-A", "--", *paths], cwd=self.clone_root)
+        workspace.stage_all(git, self.clone_root, paths)
         git.run(["commit", "-q", "-m", message], cwd=self.clone_root)
         self.commit_sha = git.head(self.clone_root)
 
@@ -714,6 +714,7 @@ class _Run:
             suggestions = self.post_suggestions(mr.id, review)
             if self.w.features.on("mr.read_comments") and not self.w.dry_run:
                 self.w.mrs.put(self.key, {"repo": self.repo.path, "id": mr.id, "branch": branch, "cursor": None,
+                                          "run_id": self.run_id, "run_started": self.rec.started.isoformat(),
                                           "last_poll": None, "last_activity": self.w.clock.now().isoformat(),
                                           "fix_rounds": 0, "suggestions": suggestions, "applies": 0})
                 self.w.mr_index.add(self.key)

@@ -1,0 +1,7 @@
+name = "self-improvement without a factory repo is a startup error"
+[overrides]
+enable = ["feedback.grading", "feedback.self_improvement"]
+[settings.feedback.self_improvement]
+repo = ""
+[expect]
+startup_error = "feedback.self_improvement.repo is required"

@@ -32,9 +32,9 @@ log = logging.getLogger("factory.writes")
 
 MINIMAL = {"claimed", "spec_posted", "needs_info", "blocked", "failed", "bounced", "finished", "stalled"}
 MILESTONES = MINIMAL | {"triaged", "implementation_started", "branch_pushed", "mr_opened", "review_done",
-                        "verification_done", "reclaimed", "resumed", "mr_feedback"}
+                        "verification_done", "reclaimed", "resumed", "mr_feedback", "email_update"}
 STANDALONE = {"needs_info", "bounced", "blocked", "failed", "finished", "spec_posted", "stalled", "reclaimed",
-              "resumed", "mr_feedback"}
+              "resumed", "mr_feedback", "email_update"}
 
 
 @dataclass
@@ -156,6 +156,20 @@ class Writes:
         if jc.status_comment_mode == "update_in_place" and milestone not in STANDALONE:
             self.state.put(f"status-comment:{self.agent}", key, posted.id)
         return posted.id
+
+    # ---- intake replies --------------------------------------------------------
+    def mail_reply(self, mailbox, reply) -> None:
+        reply = type(reply)(reply.thread_id, reply.in_reply_to, reply.to, reply.cc, reply.subject,
+                            self.redactor.redact(reply.body, policy=False).text, reply.idempotency_key)
+        if self.dry_run:
+            return self._intend("mail_reply", {"to": list(reply.to), "cc": list(reply.cc), "subject": reply.subject})
+        mailbox.send_reply(reply)
+
+    def host_comment(self, event, body: str, idempotency_key: str) -> None:
+        body = self.redactor.redact(body, policy=False).text
+        if self.dry_run:
+            return self._intend("host_comment", {"url": event.url, "body": body})
+        self.git.comment_on(event, body, idempotency_key)
 
     # ---- merge request comments ----------------------------------------------
     def mr_reply(self, repo, mr_id: str, thread_id: str, body: str, idempotency_key: str) -> None:

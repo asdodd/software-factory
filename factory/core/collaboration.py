@@ -22,6 +22,7 @@ from factory.ports.types import (
     MergeRequestState,
     Message,
     Outcome,
+    OutcomeRecord,
     Principal,
     PrincipalKind,
     RepoRef,
@@ -35,10 +36,11 @@ if TYPE_CHECKING:
 log = logging.getLogger("factory.collaboration")
 
 
-def is_own(w: Worker, author: Principal) -> bool:
-    collab = w.cfg.collaboration
+def is_own(cfg, service_accounts: set[str], author: Principal) -> bool:
+    """The factory's own identity, any agent's service account, configured bots, or any service principal."""
+    collab = cfg.collaboration
     return (author.kind in (PrincipalKind.SERVICE, PrincipalKind.BOT) or author.id == collab.factory_identity
-            or author.id in collab.bot_identities or author.id in w.service_accounts)
+            or author.id in collab.bot_identities or author.id in service_accounts)
 
 
 def allowed(w: Worker, author: Principal, ticket: Ticket, channel: str) -> bool:
@@ -79,7 +81,7 @@ def poll_replies(w: Worker) -> list[RunReport]:
         page = w.tickets.list_comments(key, paused.get("cursor"))
         answers = []
         for comment in page.items:
-            if is_own(w, comment.author):
+            if is_own(w.cfg, w.service_accounts, comment.author):
                 continue
             if not allowed(w, comment.author, ticket, "jira"):
                 _ignore(w, f"jira:{key}", comment.author, "author not allowed")
@@ -150,7 +152,7 @@ def poll_mrs(w: Worker) -> list[RunReport]:
         mr = w.git.get_merge_request(repo, info["id"])
         ticket = w.tickets.get(key)
         if mr.state is not MergeRequestState.OPEN:
-            stop_watching(w, key, f"The merge request was {mr.state.value}.", info)
+            stop_watching(w, key, f"The merge request was {mr.state.value}.", info, mr.state.value)
             continue
         if w.clock.now() - datetime.fromisoformat(info["last_activity"]) >= timedelta(days=mr_cfg.inactivity_timeout_days):
             stop_watching(w, key, f"No review activity for {mr_cfg.inactivity_timeout_days} days.", info)
@@ -159,7 +161,7 @@ def poll_mrs(w: Worker) -> list[RunReport]:
         info["cursor"] = page.next_cursor or info.get("cursor")
         events = []
         for comment in page.items:
-            if is_own(w, comment.author):
+            if is_own(w.cfg, w.service_accounts, comment.author):
                 continue
             if not allowed(w, comment.author, ticket, "mr"):
                 _ignore(w, f"mr:{key}", comment.author, "author not allowed")
@@ -173,9 +175,20 @@ def poll_mrs(w: Worker) -> list[RunReport]:
     return reports
 
 
-def stop_watching(w: Worker, key: str, why: str, info: dict) -> None:
+def stop_watching(w: Worker, key: str, why: str, info: dict, state: str = "inactive") -> None:
     w.mrs.delete(key)
     w.mr_index.remove(key)
+    w.metrics.incr("mr_outcomes", state=state, agent=w.name)
+    if info.get("run_id") and info.get("run_started"):
+        writer = w.c.trace_writer(w.features.on("feedback.trace_store"))
+        try:
+            writer.append_outcome(OutcomeRecord(
+                info["run_id"], w.clock.now(), f"mr_{state}",
+                {"mr": info["id"], "fix_rounds": int(info.get("fix_rounds", 0))}, w.name, key,
+                datetime.fromisoformat(info["run_started"])))
+            writer.flush()
+        except Exception:  # noqa: BLE001 - trace storage never blocks the loop
+            log.exception("could not record the MR outcome for %s", key)
     w.writes.comment(key, "mr_feedback", Note("Stopped watching the merge request", "in review", done=why,
                                               details=f"Fix rounds used: {info.get('fix_rounds', 0)}."),
                      f"mrstop:{key}:{info['id']}")

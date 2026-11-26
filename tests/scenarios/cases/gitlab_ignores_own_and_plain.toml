@@ -1,0 +1,17 @@
+name = "GitLab intake ignores the factory's own comments and comments without the keyword"
+include = ["_common.toml", "_gitlab.toml"]
+
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "svc-factory", body = "/followup Created follow-up ticket SIM-1" }
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "svc-factory-frontend", body = "/followup something", kind = "service" }
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "bob", body = "Looks good, maybe /followup later." }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 0
+metrics = { gitlab_intake_ignored = 2 }
+[expect.git]
+host_comments = 0

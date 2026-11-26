@@ -67,6 +67,9 @@ adapter = "clock.system"
 [plugins.id_source]
 adapter = "id_source.uuid"
 
+[workflow]
+ticket_url_template = ""
+
 [workflow.statuses]
 ready = ""
 in_progress = ""
@@ -120,6 +123,9 @@ model = ""
 provider = "primary"
 model = ""
 [models.stages.respond]
+provider = "primary"
+model = ""
+[models.stages.improve]
 provider = "primary"
 model = ""
 

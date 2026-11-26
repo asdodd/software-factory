@@ -62,8 +62,10 @@ def meta_from_dict(d: Mapping) -> RunMeta:
 
 class ObjectTraceStore:
     def __init__(self, backend: ObjectBackend, prefix: str, key_template: str, metrics: Metrics,
-                 capture_level: str = "full", retry_dir: Path | None = None) -> None:
+                 capture_level: str = "full", retry_dir: Path | None = None,
+                 read_backend: ObjectBackend | None = None) -> None:
         self.backend = backend
+        self.read_backend = read_backend or backend
         self.prefix = prefix
         self.key_template = key_template
         self.metrics = metrics
@@ -109,6 +111,11 @@ class ObjectTraceStore:
             base = self._run_prefixes.get(record.run_id)
             self._outcome_seq += 1
             seq = self._outcome_seq
+        if base is None and record.agent and record.ticket_key and record.run_started:
+            t = record.run_started
+            base = self.key_template.format(prefix=self.prefix, agent=record.agent, yyyy=f"{t.year:04d}",
+                                            mm=f"{t.month:02d}", dd=f"{t.day:02d}", ticket_key=record.ticket_key,
+                                            run_id=record.run_id)
         if base is None:
             base = self._find_prefix(record.run_id)
         key = f"{base}outcomes/{record.at:%Y%m%dT%H%M%S}-{seq:04d}-{record.kind}.json"
@@ -123,6 +130,7 @@ class ObjectTraceStore:
             try:
                 if not self.backend.exists(key):
                     self.backend.put(key, data)
+                self.metrics.incr("trace_objects_uploaded")
             except Exception:  # noqa: BLE001 - upload failures must never fail a ticket
                 failed.append((key, data))
                 self.metrics.incr("trace_upload_failures")
@@ -155,24 +163,24 @@ class ObjectTraceStore:
 
     # ---- reader ---------------------------------------------------------
     def _find_prefix(self, run_id: str) -> str:
-        for key in self.backend.list(f"{self.prefix}manifests/"):
+        for key in self.read_backend.list(f"{self.prefix}manifests/"):
             if key.endswith(f"/{run_id}.json"):
-                return json.loads(self.backend.get(key))["prefix"]
+                return json.loads(self.read_backend.get(key))["prefix"]
         raise NotFound(f"run {run_id}")
 
     def get(self, run_id: str):
         base = self._find_prefix(run_id)
-        meta = meta_from_dict(json.loads(self.backend.get(f"{base}meta.json")))
+        meta = meta_from_dict(json.loads(self.read_backend.get(f"{base}meta.json")))
         events: tuple[TraceEvent, ...] = ()
-        if self.backend.exists(f"{base}trace.jsonl.gz"):
-            raw = gzip.decompress(self.backend.get(f"{base}trace.jsonl.gz")).decode()
+        if self.read_backend.exists(f"{base}trace.jsonl.gz"):
+            raw = gzip.decompress(self.read_backend.get(f"{base}trace.jsonl.gz")).decode()
             events = tuple(
                 TraceEvent(datetime.fromisoformat(d["at"]), d["kind"], d["payload"])
                 for d in (json.loads(line) for line in raw.splitlines() if line)
             )
         outcomes = tuple(
             OutcomeRecord(d["run_id"], datetime.fromisoformat(d["at"]), d["kind"], d["payload"])
-            for d in (json.loads(self.backend.get(k)) for k in sorted(self.backend.list(f"{base}outcomes/")))
+            for d in (json.loads(self.read_backend.get(k)) for k in sorted(self.read_backend.list(f"{base}outcomes/")))
         )
         return meta, events, outcomes
 
@@ -180,18 +188,18 @@ class ObjectTraceStore:
         if query.since is None or query.until is None:
             raise ValueError("list needs a since/until date range so it never scans the whole store")
         agents = [query.agent] if query.agent else sorted({
-            k[len(f"{self.prefix}manifests/"):].split("/", 1)[0] for k in self.backend.list(f"{self.prefix}manifests/")
+            k[len(f"{self.prefix}manifests/"):].split("/", 1)[0] for k in self.read_backend.list(f"{self.prefix}manifests/")
         })
         day = query.since.date()
         while day <= query.until.date():
             for agent in agents:
-                for key in sorted(self.backend.list(f"{self.prefix}manifests/{agent}/{day:%Y-%m-%d}/")):
-                    entry = json.loads(self.backend.get(key))
+                for key in sorted(self.read_backend.list(f"{self.prefix}manifests/{agent}/{day:%Y-%m-%d}/")):
+                    entry = json.loads(self.read_backend.get(key))
                     if query.ticket_key and entry["ticket_key"] != query.ticket_key:
                         continue
                     if query.outcome and entry["outcome"] != query.outcome.value:
                         continue
-                    yield meta_from_dict(json.loads(self.backend.get(f"{entry['prefix']}meta.json")))
+                    yield meta_from_dict(json.loads(self.read_backend.get(f"{entry['prefix']}meta.json")))
             day += timedelta(days=1)
 
 

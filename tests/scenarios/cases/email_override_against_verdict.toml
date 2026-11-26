@@ -1,0 +1,23 @@
+name = "a human marking a not-ready ticket ready is recorded as an override"
+include = ["_common.toml"]
+[overrides]
+enable = ["intake.email"]
+
+[[model]]
+stage = "intake"
+content = { summary = "Make things faster", description = "vague", repo = "", acceptance_criteria = [] }
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "faster", body = "Make it faster.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+set_labels = { ticket = "SIM-1", add = ["ai-ready"] }
+[[steps]]
+intake_poll = true
+
+[expect]
+metrics = { intake_overrides = 1 }
+overrides = { "SIM-1" = "override:marked_ready_against_verdict" }
+[expect.email]
+reply_contains = ["Before work can start, it needs:", "1. The repo is not identified", "2. Acceptance criteria are not stated."]

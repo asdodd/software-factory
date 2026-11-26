@@ -49,6 +49,10 @@ class GitHost(Protocol):
 
     def post_suggestion(self, repo: RepoRef, mr_id: str, suggestion: Suggestion, idempotency_key: str) -> MrComment: ...
 
+    def comment_on(self, event: HostCommentEvent, body: str, idempotency_key: str) -> None:
+        """Reply where a comment event happened (issue or MR thread). Idempotent."""
+        ...
+
     def poll_comment_events(self, cursor: Cursor | None = None) -> Page[HostCommentEvent]:
         """Comments across watched projects, for GitLab-comment intake."""
         ...

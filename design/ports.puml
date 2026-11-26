@@ -12,6 +12,7 @@ interface TicketSystem {
   list_comments(key, cursor) : Page[Comment]
   link(source, target, kind)
   set_labels(key, add, remove) : Ticket
+  get_attachment(key, id) : bytes
   validate_filter(filter)
 }
 interface GitHost {
@@ -26,6 +27,7 @@ interface GitHost {
   reply_in_thread(repo, id, thread, body, key) : MrComment
   post_suggestion(repo, id, suggestion, key) : MrComment
   poll_comment_events(cursor) : Page[HostCommentEvent]
+  comment_on(event, body, key)
 }
 interface Mailbox {
   poll(cursor) : Page[MailMessage]
@@ -37,13 +39,19 @@ interface ModelProvider {
   complete(request) : ModelResponse
 }
 interface AgentHarness <<bring your own>> {
-  run(task: HarnessTask) : HarnessResult
+  run(task: HarnessTask, runtime: HarnessRuntime) : HarnessResult
 }
 note right of AgentHarness
   task: isolated workspace, instructions file,
   result file, gateway endpoint + per-run token,
   timeout, max_turns. No upstream credentials.
 end note
+interface HarnessRuntime {
+  guard : AccessGuard
+  max_denials : int
+  run(command) : CommandResult
+}
+AgentHarness ..> HarnessRuntime
 interface Sandbox {
   prepare(spec) : Workspace
   run(workspace, command) : CommandResult
@@ -58,8 +66,12 @@ interface AccessGuard {
   filter_output(text) : FilteredOutput
   check_diff_paths(paths) : AccessDecision
 }
-interface Notifier { notify(notification) }
-interface Monitor { poll_findings(cursor) : Page[Finding] }
+interface Notifier {
+  notify(notification)
+}
+interface Monitor {
+  poll_findings(cursor) : Page[Finding]
+}
 interface TraceWriter {
   put_run(meta, events, artifacts)
   append_outcome(record)
@@ -77,10 +89,14 @@ interface Accounting {
   spent_tokens(scope, since) : int
   check(context, estimated) : BudgetDecision
 }
-interface StateStore <<proposed>> {
+interface StateStore {
   get / put / delete
   compare_and_set(ns, key, expected, value) : bool
 }
-interface Clock { now() : datetime }
-interface IdSource { new_id(prefix) : str }
+interface Clock {
+  now() : datetime
+}
+interface IdSource {
+  new_id(prefix) : str
+}
 @enduml
