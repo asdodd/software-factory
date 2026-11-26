@@ -48,9 +48,18 @@ def isolate(clone_root: Path, dest: Path) -> str:
     return git.head(dest)
 
 
+def stage_all(git: Git, root: Path, paths: list[str] | None = None) -> None:
+    """Stage by content, not by stat cache. A same-size edit within the same second as
+    the checkout is invisible to git's stat check, so the cached entries are dropped
+    and re-hashed."""
+    spec = ["--", *paths] if paths else ["--", "."]
+    git.run(["rm", "-r", "-q", "--cached", "--ignore-unmatch", *spec], cwd=root)
+    git.run(["add", "-A", "--force", *spec], cwd=root)
+
+
 def changes(copy_root: Path) -> list[Change]:
     git = local_git()
-    git.run(["add", "-A", "--force"], cwd=copy_root)
+    stage_all(git, copy_root)
     out = git.run(["diff", "--cached", "--name-status", "--no-renames", "-z", "HEAD"], cwd=copy_root).stdout
     parts = [p for p in out.split("\0") if p]
     found = []
@@ -95,6 +104,7 @@ def apply(found: list[Change], copy_root: Path, clone_root: Path) -> list[str]:
             if source.is_symlink():
                 os.symlink(os.readlink(source), target)
             else:
-                shutil.copy2(source, target)
+                shutil.copyfile(source, target)
+                shutil.copymode(source, target)
         paths.append(change.path)
     return paths

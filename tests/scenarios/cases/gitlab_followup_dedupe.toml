@@ -1,0 +1,19 @@
+name = "GitLab intake is idempotent per event and dedupes the same follow-up from another thread"
+include = ["_common.toml", "_gitlab.toml"]
+
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "bob", body = "/followup Handle negative numbers in add", event_id = "note-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+intake_poll = true
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "alice", body = "/followup handle NEGATIVE numbers in add!", event_id = "note-2" }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 1
+[expect.git]
+host_comments = 2
+host_comments_contain = ["Created follow-up ticket SIM-1", "This matches an existing ticket: sim://jira/browse/SIM-1"]

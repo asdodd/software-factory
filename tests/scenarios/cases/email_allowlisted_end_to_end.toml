@@ -1,0 +1,30 @@
+name = "email from an allowlisted sender becomes a ready ticket, is routed, and ends in an MR"
+include = ["_common.toml", "_email.toml", "_good_change.toml"]
+[overrides]
+enable = ["intake.email.auto_label", "intake.routing"]
+[settings.intake.routing]
+rules = [{ agent = "frontend-bot", repos = ["web/portal"] }]
+
+[[steps]]
+email = { from = "Alice <alice@sim.invalid>", subject = "Need multiply", body = "Could the calc module get a multiply function?", thread = "t-100" }
+[[steps]]
+intake_poll = true
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+ticket_count = 1
+[[expect.tickets]]
+key = "SIM-1"
+reporter = "alice"
+summary = "Add multiply to calc"
+labels_include = ["ai-ready-frontend"]
+status = "In Review"
+field_contains = { acceptance_criteria = "multiply(a, b) returns the product", repo = "web/portal" }
+[expect.email]
+replies = 1
+reply_to = ["alice@sim.invalid"]
+reply_contains = ["Created SIM-1: sim://jira/browse/SIM-1", "marked ready", "add any further information as a comment on the Jira ticket", "Replies to this email are not read."]
+[expect.git]
+mrs = 1

@@ -1,0 +1,20 @@
+name = "draft-only email intake proposes a verdict; a human confirms, and the confirmation is recorded"
+include = ["_common.toml", "_email.toml"]
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+set_labels = { ticket = "SIM-1", add = ["ai-ready"] }
+[[steps]]
+intake_poll = true
+
+[expect]
+metrics = { intake_confirmations = 1, intake_overrides = 0 }
+overrides = { "SIM-1" = "confirmed" }
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["proposed ready", "draft-only mode is on"]
+[expect.email]
+reply_contains = ["It looks ready; a person will confirm before work starts."]

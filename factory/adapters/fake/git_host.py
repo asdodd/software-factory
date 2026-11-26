@@ -44,6 +44,7 @@ class FakeGitHost:
         self.suggestions: dict[str, list[Suggestion]] = defaultdict(list)
         self.pushes: list[tuple[str, str, str]] = []
         self.comment_events: list[HostCommentEvent] = []
+        self.target_comments: list[tuple[str, str, str, str]] = []
         self.clones: list[str] = []
         self._keys: dict[str, object] = {}
         self._seq = 0
@@ -220,6 +221,22 @@ class FakeGitHost:
         self.suggestions[mr_id].append(suggestion)
         body = f"{suggestion.note}\n```suggestion:-0+{suggestion.line_end - suggestion.line_start}\n{suggestion.replacement}\n```"
         return self.reply_in_thread(repo, mr_id, f"s{len(self.suggestions[mr_id])}", body, idempotency_key)
+
+    def add_comment_event(self, repo: str, author: str, body: str, target_kind: str = "merge_request",
+                          target_id: str = "1", event_id: str | None = None,
+                          kind: PrincipalKind = PrincipalKind.USER) -> HostCommentEvent:
+        self._seq += 1
+        event = HostCommentEvent(event_id or f"ev{self._seq}", RepoRef("", repo, "main"), target_kind, target_id,
+                                 Principal(author, author, kind), body, self.clock.now(),
+                                 f"fake://{repo}/-/{target_kind}s/{target_id}#note_{self._seq}")
+        self.comment_events.append(event)
+        return event
+
+    def comment_on(self, event: HostCommentEvent, body: str, idempotency_key: str) -> None:
+        if idempotency_key in self._keys:
+            return
+        self._keys[idempotency_key] = body
+        self.target_comments.append((event.repo.path, event.target_kind, event.target_id, body))
 
     def poll_comment_events(self, cursor: Cursor | None = None) -> Page[HostCommentEvent]:
         start = int(cursor or 0)

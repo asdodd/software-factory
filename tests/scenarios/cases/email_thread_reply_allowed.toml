@@ -1,0 +1,19 @@
+name = "with allow_updates true, a thread reply is added to the ticket as untrusted content, with a warning"
+include = ["_common.toml", "_email.toml"]
+[settings.intake.email]
+allow_updates = true
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Re: Need multiply", body = "It should accept floats too.", thread = "t-1" }
+[[steps]]
+intake_poll = true
+
+[expect]
+warnings_contain = ["intake.email.allow_updates is true"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["Email update", "(untrusted email content)", "It should accept floats too."]

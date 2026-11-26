@@ -58,6 +58,7 @@ adapter = "access_guard.policy"   # the only guard; not swappable per profile in
 # Profiles fill these in; they are left empty here on purpose.
 [workflow]
 claim_from = ["ready"]
+ticket_url_template = ""                 # e.g. "https://jira.internal/browse/{key}"; used in replies
 # [workflow.statuses]   ready = "...", in_progress = "...", spec_review = "...",
 #                       in_review = "...", needs_info = "...", blocked = "...",
 #                       stalled = "...", failed = "...", done = "..."
@@ -157,12 +158,21 @@ mode = "strip"                           # strip | deny_read
 
 [intake]
 dedupe_window_days = 90
+override_window_days = 14                # how long human overrides of intake verdicts are tracked
 [intake.email]
+address = ""                             # the bot's mailbox; mail is read only when it is in To or Cc
 allow_updates = false                    # email never updates tickets or agent context
 auto_label = false                       # false = draft-only, a human applies the label
-allowlisted_senders = []
+allowlisted_senders = []                 # wildcards allowed: "*@team.example"
+require_authenticated_sender = false     # true: allowlist counts only with dkim/dmarc pass in Authentication-Results
+user_map = {}                            # "alice@team.example" = "alice"
+max_reply_recipients = 10                # more than this, or a mailing list: reply to the sender only
+max_attachment_bytes = 200000
 [intake.gitlab]
-keyword = "/followup"
+keyword = "/followup"                    # first word of an MR or issue comment
+auto_label = false                       # false = draft-only, a human applies the label
+allowed_authors = []
+reply = true                             # reply in the thread with the new ticket
 [intake.routing]
 enabled = false
 rules = []                               # [{agent = "docs-bot", components = ["docs"]}]

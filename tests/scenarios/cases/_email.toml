@@ -1,0 +1,8 @@
+# Email intake on, with a scripted drafter that maps the thread to web/portal.
+[overrides]
+enable = ["intake.email"]
+
+[[model]]
+stage = "intake"
+content = { summary = "Add multiply to calc", description = "Requested: a multiply function.", repo = "web/portal", components = ["ui"], acceptance_criteria = ["multiply(a, b) returns the product"], verify_steps = "python3 -m unittest" }
+repeat = true

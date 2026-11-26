@@ -38,4 +38,4 @@ assignee = "svc-factory-docs"
 key = "SIM-2"
 labels_exclude = ["ai-ready-frontend", "ai-ready"]
 status = "Open"
-comments_contain = ["A human must confirm readiness and apply the label."]
+comments_contain = ["proposed ready", "the sender is not trusted"]

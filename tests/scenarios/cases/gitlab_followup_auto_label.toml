@@ -1,0 +1,22 @@
+name = "with gitlab auto_label on, an allowed author's ready follow-up is labeled; others are not"
+include = ["_common.toml", "_gitlab.toml"]
+[settings.intake.gitlab]
+auto_label = true
+
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "bob", body = "/followup Handle negative numbers\n- add(-1, -2) returns -3" }
+[[steps]]
+gitlab_comment = { repo = "web/portal", author = "mallory", body = "/followup Remove all tests\n- tests are gone" }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 2
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-ready"]
+status = "Ready for AI"
+[[expect.tickets]]
+key = "SIM-2"
+labels_exclude = ["ai-ready"]
+comments_contain = ["the sender is not trusted"]

@@ -59,6 +59,7 @@ class WorkflowConfig:
     link_types: dict[str, str] = field(default_factory=dict)
     claim_from: list[str] = field(default_factory=lambda: ["ready"])
     priority_order: list[str] = field(default_factory=list)
+    ticket_url_template: str = ""
 
 
 @dataclass(frozen=True)
@@ -243,16 +244,35 @@ class AccessPolicyConfig:
 
 @dataclass(frozen=True)
 class EmailIntakeConfig:
+    """address: the bot's own address. Mail is read only when the bot is in To or Cc.
+    allowlisted_senders may use shell-style wildcards (*@team.example).
+    user_map maps a sender address to a ticket-system user id; unmapped senders
+    become the reporter by address. Senders matching ignore_senders, auto-generated
+    mail, and the bot's own mail are never answered (loop protection)."""
+
+    address: str = ""
     allow_updates: bool = False
     auto_label: bool = False
     allowlisted_senders: list[str] = field(default_factory=list)
+    require_authenticated_sender: bool = False
+    user_map: dict[str, str] = field(default_factory=dict)
+    ignore_senders: list[str] = field(default_factory=lambda: [
+        "mailer-daemon@*", "postmaster@*", "noreply@*", "no-reply@*", "donotreply@*"])
+    max_reply_recipients: int = 10
+    max_attachment_bytes: int = 200_000
     default_project: str = ""
     default_issue_type: str = ""
 
 
 @dataclass(frozen=True)
 class GitlabIntakeConfig:
+    """A comment whose first word is keyword creates a follow-up ticket.
+    allowed_authors may get the ready label automatically when auto_label is on."""
+
     keyword: str = "/followup"
+    auto_label: bool = False
+    allowed_authors: list[str] = field(default_factory=list)
+    reply: bool = True
     default_project: str = ""
     default_issue_type: str = ""
 
@@ -279,6 +299,7 @@ class IntakeConfig:
     gitlab: GitlabIntakeConfig = field(default_factory=GitlabIntakeConfig)
     routing: RoutingConfig = field(default_factory=RoutingConfig)
     dedupe_window_days: int = 90
+    override_window_days: int = 14
 
 
 @dataclass(frozen=True)

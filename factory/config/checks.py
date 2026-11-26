@@ -18,7 +18,7 @@ MODEL_STAGES = {
     "spec": ("spec",),
     "implement": ("implement",),
     "review": ("review",),
-    "intake": ("intake.email", "intake.gitlab_comments"),
+    "intake": ("intake.email",),
     "grading": ("feedback.grading",),
     "respond": ("mr.respond", "mr.auto_fix"),
 }

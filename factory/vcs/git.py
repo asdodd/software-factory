@@ -91,8 +91,8 @@ class Git:
         except subprocess.TimeoutExpired:
             raise GitError(f"git {args[0]} timed out after {self.options.timeout_seconds}s") from None
         if check and proc.returncode != 0:
-            stderr = self.redactor.redact(proc.stderr.strip()).text
-            raise GitError(f"git {args[0]} failed: {stderr[-800:]}", proc.returncode)
+            detail = self.redactor.redact(proc.stderr.strip() or proc.stdout.strip()).text
+            raise GitError(f"git {args[0]} failed: {detail[-800:]}", proc.returncode)
         return proc
 
     def out(self, args: Sequence[str], cwd: Path | None = None) -> str:

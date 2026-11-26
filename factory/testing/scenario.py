@@ -7,6 +7,7 @@ and harness behavior, race hooks), a list of steps, and the expected end state.
 from __future__ import annotations
 
 import gzip
+import json
 import os
 import shutil
 import tempfile
@@ -172,6 +173,27 @@ def run(data: dict, root: Path, workdir: Path, scenario_dir: Path) -> ScenarioRe
         elif "human_comment" in step:
             hc = step["human_comment"]
             tickets.add_human_comment(hc["ticket"], hc["author"], hc["body"], hc.get("groups", ()))
+        elif "email" in step:
+            from factory.ports.types import MailAttachment, MailMessage
+            e = dict(step["email"])
+            n = len(c.port("mailbox").messages) + 1
+            atts = tuple(MailAttachment(a["name"], a.get("type", "text/plain"), a["content"].encode())
+                         for a in e.get("attachments", []))
+            c.port("mailbox").deliver(MailMessage(
+                e.get("message_id", f"<m{n}@sim.invalid>"), e.get("thread", f"thread-{n}"), e.get("in_reply_to"),
+                e["from"], tuple(e.get("to", ["factory@sim.invalid"])), tuple(e.get("cc", [])),
+                e.get("subject", "Request"), e.get("body", ""), dict(e.get("headers", {})), c.port("clock").now(), atts))
+        elif "gitlab_comment" in step:
+            from factory.ports.types import PrincipalKind
+            gc = dict(step["gitlab_comment"])
+            git.add_comment_event(gc["repo"], gc["author"], gc["body"], gc.get("target_kind", "merge_request"),
+                                  str(gc.get("target_id", "1")), gc.get("event_id"),
+                                  PrincipalKind(gc.get("kind", "user")))
+        elif step.get("intake_poll"):
+            from factory.core.intake_sources import IntakeRunner
+            if "intake" not in workers:
+                workers["intake"] = IntakeRunner(c)
+            workers["intake"].run_once()
         elif "advance_hours" in step:
             c.port("clock").advance(hours=step["advance_hours"])
         elif "mr_comment" in step:
@@ -369,10 +391,57 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
         sent = c.port("notifier").sent if "notifier" in c._ports else []
         if len(sent) != expect["notifications"]:
             fail(f"{len(sent)} notifications != {expect['notifications']}")
+    em = expect.get("email", {})
+    if em:
+        sent = list(c.port("mailbox").sent.values()) if "mailbox" in c._ports else []
+        if "replies" in em and len(sent) != em["replies"]:
+            fail(f"{len(sent)} email replies != {em['replies']}: {[r.body for r in sent]}")
+        for text in em.get("reply_contains", []):
+            if not any(text in r.body for r in sent):
+                fail(f"no email reply contains {text!r}: {[r.body for r in sent]}")
+        for text in em.get("reply_excludes", []):
+            if any(text in r.body for r in sent):
+                fail(f"an email reply contains {text!r}")
+        if "reply_to" in em and not any(list(r.to) == em["reply_to"] for r in sent):
+            fail(f"no reply addressed to {em['reply_to']}: {[list(r.to) for r in sent]}")
+        if "reply_cc" in em and not any(sorted(r.cc) == sorted(em["reply_cc"]) for r in sent):
+            fail(f"no reply with cc {em['reply_cc']}: {[list(r.cc) for r in sent]}")
+    for text in g.get("host_comments_contain", []):
+        if not any(text in body for *_, body in git.target_comments):
+            fail(f"no host comment contains {text!r}: {git.target_comments}")
+    if "host_comments" in g and len(git.target_comments) != g["host_comments"]:
+        fail(f"{len(git.target_comments)} host comments != {g['host_comments']}")
+    for t in expect.get("tickets", []):
+        ticket = tickets.tickets.get(t["key"])
+        if ticket is not None and "reporter" in t:
+            got = ticket.reporter.id if ticket.reporter else ""
+            if got != t["reporter"]:
+                fail(f"{t['key']}: reporter {got!r} != {t['reporter']!r}")
+        if ticket is not None and "field_contains" in t:
+            for name, needle in t["field_contains"].items():
+                if needle not in str(ticket.fields.get(name, "")):
+                    fail(f"{t['key']}: field {name} lacks {needle!r}: {ticket.fields.get(name)!r}")
+        if ticket is not None and "summary" in t and ticket.summary != t["summary"]:
+            fail(f"{t['key']}: summary {ticket.summary!r} != {t['summary']!r}")
+    if "overrides" in expect:
+        state = c.port("state_store")
+        for key, outcome in expect["overrides"].items():
+            raw = state.get("intake-overrides", key)
+            got = json.loads(raw)["outcome"] if raw else None
+            if got != outcome:
+                fail(f"{key}: override outcome {got!r} != {outcome!r}")
     if "intended_writes_at_least" in expect:
         n = sum(len(w.writes.intended) for w in workers.values())
         if n < expect["intended_writes_at_least"]:
             fail(f"{n} intended dry-run writes < {expect['intended_writes_at_least']}")
+    for name, spec in expect.get("model_requests", {}).items():
+        texts = [m.content for r in c.provider(name).requests for m in r.messages]
+        for needle in spec.get("contain", []):
+            if not any(needle in t for t in texts):
+                fail(f"no request to {name} contains {needle!r}")
+        for needle in spec.get("exclude", []):
+            if any(needle in t for t in texts):
+                fail(f"a request to {name} contains forbidden text {needle!r}")
     for name, count in expect.get("model_calls", {}).items():
         reqs = c.provider(name).requests
         if len(reqs) != count:

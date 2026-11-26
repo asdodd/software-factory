@@ -1,0 +1,20 @@
+name = "duplicate email delivery is idempotent, and a second thread about the same thing is deduped"
+include = ["_common.toml", "_email.toml"]
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1", message_id = "<same@sim.invalid>" }
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply", body = "Please add multiply.", thread = "t-1", message_id = "<same@sim.invalid>" }
+[[steps]]
+email = { from = "bob@sim.invalid", subject = "multiply please", body = "We also need multiply.", thread = "t-2" }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 1
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["A matching report arrived from email; no duplicate was created."]
+[expect.email]
+replies = 2
+reply_contains = ["Created SIM-1", "This matches an existing ticket, SIM-1"]

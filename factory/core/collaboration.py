@@ -35,10 +35,11 @@ if TYPE_CHECKING:
 log = logging.getLogger("factory.collaboration")
 
 
-def is_own(w: Worker, author: Principal) -> bool:
-    collab = w.cfg.collaboration
+def is_own(cfg, service_accounts: set[str], author: Principal) -> bool:
+    """The factory's own identity, any agent's service account, configured bots, or any service principal."""
+    collab = cfg.collaboration
     return (author.kind in (PrincipalKind.SERVICE, PrincipalKind.BOT) or author.id == collab.factory_identity
-            or author.id in collab.bot_identities or author.id in w.service_accounts)
+            or author.id in collab.bot_identities or author.id in service_accounts)
 
 
 def allowed(w: Worker, author: Principal, ticket: Ticket, channel: str) -> bool:
@@ -79,7 +80,7 @@ def poll_replies(w: Worker) -> list[RunReport]:
         page = w.tickets.list_comments(key, paused.get("cursor"))
         answers = []
         for comment in page.items:
-            if is_own(w, comment.author):
+            if is_own(w.cfg, w.service_accounts, comment.author):
                 continue
             if not allowed(w, comment.author, ticket, "jira"):
                 _ignore(w, f"jira:{key}", comment.author, "author not allowed")
@@ -159,7 +160,7 @@ def poll_mrs(w: Worker) -> list[RunReport]:
         info["cursor"] = page.next_cursor or info.get("cursor")
         events = []
         for comment in page.items:
-            if is_own(w, comment.author):
+            if is_own(w.cfg, w.service_accounts, comment.author):
                 continue
             if not allowed(w, comment.author, ticket, "mr"):
                 _ignore(w, f"mr:{key}", comment.author, "author not allowed")

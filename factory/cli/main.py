@@ -68,6 +68,10 @@ def parser() -> argparse.ArgumentParser:
     who.add_argument("--all-agents", action="store_true")
     p.add_argument("--loop", action="store_true", help="keep polling instead of running one cycle")
     p.add_argument("--interval", type=float, default=60.0)
+    p = sub.add_parser("intake", help="poll enabled intake sources (email, GitLab comments) and reconcile overrides")
+    _common(p)
+    p.add_argument("--loop", action="store_true")
+    p.add_argument("--interval", type=float, default=60.0)
     scen = sub.add_parser("scenario", help="run declarative simulation scenarios")
     ssub = scen.add_subparsers(dest="action", required=True)
     p = ssub.add_parser("run")
@@ -163,6 +167,28 @@ def cmd_run(args) -> int:
         time.sleep(args.interval)
 
 
+def cmd_intake(args) -> int:
+    from factory.core.container import Container
+    from factory.core.intake_sources import IntakeRunner
+
+    loaded = _load(args)
+    _print_diagnostics(loaded)
+    if loaded.profile == "sim":
+        from factory.testing import netguard
+        netguard.install()
+    container = Container(loaded)
+    logging.getLogger().addFilter(RedactingFilter(container.redactor))
+    runner = IntakeRunner(container)
+    while True:
+        for result in runner.run_once():
+            state = "duplicate of " + result.duplicate_of if result.duplicate_of else (
+                "ready" if result.ready else f"verdict {result.verdict}")
+            print(f"intake  {result.ticket_key}  {state}  {result.routed_to}".rstrip())
+        if not args.loop:
+            return 0
+        time.sleep(args.interval)
+
+
 def cmd_scenario(args) -> int:
     from factory.testing import netguard
     from factory.testing.scenario import run_file
@@ -182,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     args = parser().parse_args(argv)
     handlers = {"config": cmd_config, "features": cmd_features, "agents": cmd_agents, "run": cmd_run,
-                "scenario": cmd_scenario}
+                "scenario": cmd_scenario, "intake": cmd_intake}
     try:
         return handlers[args.command](args)
     except ConfigError as exc:

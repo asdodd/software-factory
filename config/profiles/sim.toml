@@ -55,6 +55,7 @@ failed = "Open"
 done = "Done"
 
 [workflow]
+ticket_url_template = "sim://jira/browse/{key}"
 priority_order = ["Highest", "High", "Medium", "Low", "Lowest"]
 
 [workflow.fields]
@@ -88,11 +89,14 @@ groups = ["factory-reviewers"]
 include_reporter = true
 
 [intake.email]
-allowlisted_senders = ["alice@sim.invalid"]
+address = "factory@sim.invalid"
+allowlisted_senders = ["alice@sim.invalid", "*@trusted.sim.invalid"]
+user_map = { "alice@sim.invalid" = "alice", "bob@sim.invalid" = "bob" }
 default_project = "SIM"
 default_issue_type = "Task"
 
 [intake.gitlab]
+allowed_authors = ["alice", "bob"]
 default_project = "SIM"
 default_issue_type = "Task"
 
