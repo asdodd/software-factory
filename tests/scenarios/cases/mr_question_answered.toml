@@ -1,0 +1,21 @@
+name = "a reviewer's question on the MR is answered in the thread"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[[model]]
+stage = "respond"
+content = { kind = "question", reply = "multiply matches the existing add() naming." }
+
+[[steps]]
+mr_comment = { author = "bob", body = "Why is it called multiply and not product?", thread = "t-q" }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+mr_replies = 1
+mr_replies_contain = ["multiply matches the existing add() naming."]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+comments_contain = ["Merge request feedback", "Answered a reviewer question."]

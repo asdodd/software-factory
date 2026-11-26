@@ -1,0 +1,19 @@
+name = "an empty allowed-commenter rule ignores and logs every reply"
+include = ["_common.toml", "_ticket.toml", "_paused.toml"]
+[settings.collaboration.allowed_commenters]
+users = []
+groups = []
+include_reporter = false
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "alice", body = "Yes, round to 2 decimals." }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info"]
+metrics = { comments_ignored = 1 }
+warnings_contain = ["allowed-commenter rule is empty"]
+[[expect.tickets]]
+key = "SIM-1"
+paused = true

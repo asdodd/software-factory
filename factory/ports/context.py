@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -25,3 +26,4 @@ class AdapterContext:
     metrics: Metrics = field(default_factory=Metrics)
     clock: Clock | None = None
     ids: IdSource | None = None
+    port: Callable[[str], object] | None = None  # lazy lookup of other ports, for adapters that compose them

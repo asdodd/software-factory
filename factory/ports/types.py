@@ -38,6 +38,7 @@ class Principal:
     display_name: str = ""
     kind: PrincipalKind = PrincipalKind.USER
     groups: frozenset[str] = frozenset()
+    roles: frozenset[str] = frozenset()
 
 
 class LogicalStatus(enum.Enum):
@@ -430,6 +431,10 @@ class Outcome(enum.Enum):
     MR_OPENED = "mr_opened"
     SPEC_REVIEW = "spec_review"
     CLAIM_LOST = "claim_lost"
+    RESUMED = "resumed"
+    FIX_PUSHED = "fix_pushed"
+    FIX_FAILED = "fix_failed"
+    REPLIED = "replied"
     BRANCH_PUSHED = "branch_pushed"
     NEEDS_INFO = "needs_info"
     BLOCKED = "blocked"

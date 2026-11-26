@@ -72,8 +72,12 @@ def line_stats(copy_root: Path) -> LineStats:
     return LineStats(added, deleted, lines)
 
 
-def diff_text(copy_root: Path) -> str:
-    return local_git().run(["diff", "--cached", "HEAD"], cwd=copy_root).stdout
+def diff_text(copy_root: Path, context: int = 3) -> str:
+    return local_git().run(["diff", "--cached", f"-U{context}", "HEAD"], cwd=copy_root).stdout
+
+
+def tracked_files(copy_root: Path) -> list[str]:
+    return local_git().out(["ls-files"], cwd=copy_root).splitlines()
 
 
 def apply(found: list[Change], copy_root: Path, clone_root: Path) -> list[str]:

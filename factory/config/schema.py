@@ -87,6 +87,7 @@ class CollaborationConfig:
     jira_allowed_commenters: CommenterRule | None = None
     mr_allowed_commenters: CommenterRule | None = None
     bot_identities: list[str] = field(default_factory=list)
+    factory_identity: str = ""
 
 
 @dataclass(frozen=True)
@@ -302,6 +303,7 @@ class StageModels:
     review: StageModel = field(default_factory=StageModel)
     intake: StageModel = field(default_factory=StageModel)
     grading: StageModel = field(default_factory=StageModel)
+    respond: StageModel = field(default_factory=StageModel)
 
 
 @dataclass(frozen=True)
@@ -347,6 +349,17 @@ class HarnessConfig:
 
 
 @dataclass(frozen=True)
+class NotificationsConfig:
+    """Who is alerted, by user id. The reporter is added when include_reporter is true."""
+
+    include_reporter: bool = True
+    spec_review: list[str] = field(default_factory=list)
+    mr_ready: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+    blocked: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class GatesConfig:
     max_comment_density: float = 0.15
     min_changed_line_coverage: float = 0.8
@@ -385,6 +398,7 @@ class FactoryConfig:
     harnesses: dict[str, HarnessConfig] = field(default_factory=dict)
     gateway: GatewayConfig = field(default_factory=GatewayConfig)
     gates: GatesConfig = field(default_factory=GatesConfig)
+    notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -449,6 +463,16 @@ class RepoCommands:
 
 
 @dataclass(frozen=True)
+class MutationRules:
+    """command produces report; format stryker (mutation-testing-report-schema) or
+    score ({"score": 0.0-1.0}). Empty command means mutation is not measured."""
+
+    command: list[str] = field(default_factory=list)
+    report: str = ""
+    format: Literal["stryker", "score"] = "stryker"
+
+
+@dataclass(frozen=True)
 class RepoRules:
     """Per-repo layer, read from `.factory/rules.toml` in the repo. It may add
     rules and deny patterns, never relax global ones."""
@@ -459,3 +483,5 @@ class RepoRules:
     extra_deny_patterns: list[str] = field(default_factory=list)
     protected_paths: list[str] = field(default_factory=list)
     command_timeout_seconds: int = 900
+    coverage_report: str = ""
+    mutation: MutationRules = field(default_factory=MutationRules)

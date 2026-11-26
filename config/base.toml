@@ -75,6 +75,7 @@ stalled = ""
 spec_approved = ""
 
 [collaboration]
+factory_identity = ""  # the account the factory posts as; its comments are never read as replies
 bot_identities = []   # other bots whose comments are always ignored
 [collaboration.allowed_commenters]   # empty = nobody; replies are logged and ignored
 users = []
@@ -191,6 +192,9 @@ model = ""
 [models.stages.grading]
 provider = ""
 model = ""
+[models.stages.respond]                  # classifies and answers MR comments
+provider = ""
+model = ""
 [models.budgets]                         # 0 = no limit at this scope
 user_tokens_per_day = 0
 team_tokens_per_day = 0
@@ -251,6 +255,14 @@ settings = { agent = "codex", launcher = "jam" }
 bind_host = "127.0.0.1"
 dialects = ["openai_chat", "anthropic_messages"]
 request_timeout_seconds = 300
+
+# Who is alerted, by user id (the ticket reporter is added when include_reporter is true).
+[notifications]
+include_reporter = true
+spec_review = []
+mr_ready = []
+failed = []
+blocked = []
 
 [gates]
 max_comment_density = 0.15

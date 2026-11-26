@@ -42,6 +42,7 @@ class Container:
         for name in loaded.enabled_agents():
             allowed |= set(required_ports(loaded.agent_features[name]))
         self.allowed_ports = allowed
+        self.ctx.port = self.port
         self.ctx.clock = self.port("clock")
         self.ctx.ids = self.port("id_source")
 

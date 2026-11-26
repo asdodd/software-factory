@@ -171,7 +171,16 @@ def run(data: dict, root: Path, workdir: Path, scenario_dir: Path) -> ScenarioRe
             IntakeService(loaded, tickets, c.port("state_store"), c.port("clock"), writes).submit(IntakeEvent(**ev))
         elif "human_comment" in step:
             hc = step["human_comment"]
-            tickets.add_human_comment(hc["ticket"], hc["author"], hc["body"])
+            tickets.add_human_comment(hc["ticket"], hc["author"], hc["body"], hc.get("groups", ()))
+        elif "advance_hours" in step:
+            c.port("clock").advance(hours=step["advance_hours"])
+        elif "mr_comment" in step:
+            mc = step["mr_comment"]
+            git.add_mr_comment(str(mc.get("mr", "1")), mc["author"], mc["body"], mc.get("thread"))
+        elif "set_mr_state" in step:
+            from factory.ports.types import MergeRequestState
+            ms = step["set_mr_state"]
+            git.set_mr_state(str(ms.get("mr", "1")), MergeRequestState(ms["state"]))
         elif "set_labels" in step:
             sl = step["set_labels"]
             tickets.set_labels(sl["ticket"], sl.get("add", ()), sl.get("remove", ()))
@@ -321,6 +330,37 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
             for var in ho.get("env_excludes", []):
                 if var in obs["env_keys"]:
                     fail(f"harness environment contains {var}")
+    bot_id = git.identity.id
+    replies = [cm.body for cms in git.mr_comments.values() for cm in cms if cm.author.id == bot_id]
+    for text in g.get("mr_replies_contain", []):
+        if not any(text in r for r in replies):
+            fail(f"no MR reply contains {text!r}; replies: {replies}")
+    if "mr_replies" in g and len(replies) != g["mr_replies"]:
+        fail(f"{len(replies)} MR replies != {g['mr_replies']}: {replies}")
+    if "suggestions" in g:
+        n = sum(len(v) for v in git.suggestions.values())
+        if n != g["suggestions"]:
+            fail(f"{n} suggestions posted != {g['suggestions']}")
+    for branch, count in g.get("push_counts", {}).items():
+        n = sum(1 for _, b, _ in git.pushes if b == branch)
+        if n != count:
+            fail(f"{n} pushes to {branch} != {count} (pushes: {pushed})")
+    for mr_id, target in g.get("mr_targets", {}).items():
+        mr = git.mrs.get(mr_id)
+        if mr is None or mr.target_branch != target:
+            fail(f"MR {mr_id} target {getattr(mr, 'target_branch', None)!r} != {target!r}")
+    state = c.port("state_store")
+    for t in expect.get("tickets", []):
+        if "paused" in t:
+            paused = any(state.get(f"paused:{a}", t["key"]) for a in c.loaded.agents)
+            if paused != t["paused"]:
+                fail(f"{t['key']}: paused is {paused}, expected {t['paused']}")
+    if "notified" in expect:
+        sent = c.port("notifier").sent if "notifier" in c._ports else []
+        got = [[n.kind.value, sorted(n.recipients)] for n in sent]
+        for want in expect["notified"]:
+            if [want[0], sorted(want[1])] not in got:
+                fail(f"no notification {want}; sent: {got}")
     if "trace_pending_at_least" in expect:
         pending = c.trace_store().pending
         if pending < expect["trace_pending_at_least"]:

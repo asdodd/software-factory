@@ -80,6 +80,7 @@ stalled = "ai-stalled"
 spec_approved = "ai-spec-approved"
 
 [collaboration]
+factory_identity = "svc-factory"
 bot_identities = ["svc-other-bot"]
 [collaboration.allowed_commenters]
 users = ["alice", "bob"]
@@ -114,6 +115,14 @@ model = "sim-small"
 [models.stages.grading]
 provider = "scripted"
 model = "sim-small"
+[models.stages.respond]
+provider = "scripted"
+model = "sim-small"
+
+[notifications]
+spec_review = ["carol"]
+mr_ready = ["carol"]
+failed = ["carol"]
 
 [trace_store.local_fs]
 root = "var/sim/traces"

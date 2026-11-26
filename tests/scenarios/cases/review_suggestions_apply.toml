@@ -1,0 +1,27 @@
+name = "review findings become suggested changes, and /apply opens a follow-up MR"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml"]
+
+[[model]]
+stage = "review"
+ticket = "SIM-1"
+content = { summary = "Fine, one nit.", blast_radius = "calc only", merge_danger = "low", findings = [{ note = "Prefer the conventional operand order.", path = "src/calc.py", line_start = 6, line_end = 6, replacement = "    return b * a" }, { note = "General: consider type hints." }] }
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+mr_comment = { author = "bob", body = "/apply", thread = "t-apply" }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened", "fix_pushed"]
+[expect.git]
+mrs = 2
+suggestions = 1
+mr_targets = { "2" = "ai/frontend-bot/SIM-1" }
+mr_replies_contain = ["Prefer the conventional operand order.", "with the remaining suggestions applied"]
+mr_description_contains = ["consider type hints"]
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "ai/frontend-bot/SIM-1-apply-1"
+contains = { "src/calc.py" = "return b * a" }

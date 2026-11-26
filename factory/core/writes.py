@@ -32,8 +32,9 @@ log = logging.getLogger("factory.writes")
 
 MINIMAL = {"claimed", "spec_posted", "needs_info", "blocked", "failed", "bounced", "finished", "stalled"}
 MILESTONES = MINIMAL | {"triaged", "implementation_started", "branch_pushed", "mr_opened", "review_done",
-                        "verification_done", "reclaimed"}
-STANDALONE = {"needs_info", "bounced", "blocked", "failed", "finished", "spec_posted", "stalled", "reclaimed"}
+                        "verification_done", "reclaimed", "resumed", "mr_feedback"}
+STANDALONE = {"needs_info", "bounced", "blocked", "failed", "finished", "spec_posted", "stalled", "reclaimed",
+              "resumed", "mr_feedback"}
 
 
 @dataclass
@@ -133,28 +134,40 @@ class Writes:
         self.state.put(ns, key, json.dumps(times))
         return True
 
-    def comment(self, key: TicketKey, milestone: str, note: Note, idempotency_key: str) -> bool:
+    def comment(self, key: TicketKey, milestone: str, note: Note, idempotency_key: str) -> str | None:
+        """Returns the id of the comment written or edited, or None when nothing was posted."""
         jc = self.config.jira_comments
         if not jc.post:
-            return False
+            return None
         allowed = MINIMAL if jc.verbosity == "minimal" else MILESTONES
         if jc.verbosity != "verbose" and milestone not in allowed:
-            return False
+            return None
         body = self.redactor.redact(note.render(jc.verbosity == "verbose"), policy=False).text
         if self.dry_run:
             self._intend("comment", {"ticket": key, "milestone": milestone, "body": body})
-            return True
+            return None
         if not self._rate_ok(key):
             log.warning("comment rate limit reached on %s; skipping %s", key, milestone)
-            return False
+            return None
         living = self.state.get(f"status-comment:{self.agent}", key)
         if jc.status_comment_mode == "update_in_place" and milestone not in STANDALONE and living:
-            self.tickets.edit_comment(key, living, body)
-            return True
+            return self.tickets.edit_comment(key, living, body).id
         posted = self.tickets.add_comment(key, body, idempotency_key)
         if jc.status_comment_mode == "update_in_place" and milestone not in STANDALONE:
             self.state.put(f"status-comment:{self.agent}", key, posted.id)
-        return True
+        return posted.id
+
+    # ---- merge request comments ----------------------------------------------
+    def mr_reply(self, repo, mr_id: str, thread_id: str, body: str, idempotency_key: str) -> None:
+        body = self.redactor.redact(body, policy=False).text
+        if self.dry_run:
+            return self._intend("mr_reply", {"mr": mr_id, "thread": thread_id, "body": body})
+        self.git.reply_in_thread(repo, mr_id, thread_id, body, idempotency_key)
+
+    def mr_suggestion(self, repo, mr_id: str, suggestion, idempotency_key: str) -> None:
+        if self.dry_run:
+            return self._intend("mr_suggestion", {"mr": mr_id, "path": suggestion.path})
+        self.git.post_suggestion(repo, mr_id, suggestion, idempotency_key)
 
     # ---- git host writes ------------------------------------------------
     def push_branch(self, workspace: Path, branch: str) -> str:

@@ -1,0 +1,18 @@
+name = "the agent ignores its own comments and other configured bots"
+include = ["_common.toml", "_ticket.toml", "_paused.toml"]
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "svc-factory", body = "Yes, round to 2 decimals." }
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "svc-other-bot", body = "Auto-reply: noted." }
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "svc-factory-docs", body = "Another agent says hi." }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info"]
+metrics = { comments_ignored = 0 }
+[[expect.tickets]]
+key = "SIM-1"
+paused = true

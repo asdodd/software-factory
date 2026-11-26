@@ -1,0 +1,7 @@
+# SIM-1 pauses with a question on its first harness run.
+[[harness]]
+ticket = "SIM-1"
+actions = [{ result = { status = "needs_info", summary = "Rounding is unclear.", questions = ["Round to 2 decimals?"] } }]
+
+[[steps]]
+run = "frontend-bot"

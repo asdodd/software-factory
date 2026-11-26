@@ -1,0 +1,22 @@
+name = "the agent stops watching a merged MR and summarizes on the ticket"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[[steps]]
+set_mr_state = { state = "merged" }
+[[steps]]
+mr_comment = { author = "bob", body = "Thanks!", thread = "t-late" }
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+advance_minutes = 10
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+model_calls = { scripted = 2 }
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["Stopped watching the merge request", "The merge request was merged."]
+[expect.git]
+mr_replies = 0

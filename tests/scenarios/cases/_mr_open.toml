@@ -1,0 +1,3 @@
+# SIM-1 gets an MR (id 1) on the first run.
+[[steps]]
+run = "frontend-bot"

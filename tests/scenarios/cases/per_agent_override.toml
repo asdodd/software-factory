@@ -49,7 +49,7 @@ run = "docs-bot"
 
 [expect]
 outcomes = ["spec_review", "branch_pushed"]
-notifications = 1
+notifications = 2
 [[expect.tickets]]
 key = "SIM-1"
 status = "Spec Review"

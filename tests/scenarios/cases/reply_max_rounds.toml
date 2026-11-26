@@ -1,0 +1,20 @@
+name = "a second round of questions past max_question_rounds stalls the ticket"
+include = ["_common.toml", "_ticket.toml", "_paused.toml"]
+[settings.jira_comments]
+max_question_rounds = 1
+
+[[harness]]
+ticket = "SIM-1"
+actions = [{ result = { status = "needs_info", summary = "Still unclear.", questions = ["Which rounding mode?"] } }]
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "bob", body = "Maybe." }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info", "stalled"]
+[[expect.tickets]]
+key = "SIM-1"
+labels_include = ["ai-stalled"]
+comments_contain = ["Still unclear after 1 rounds of questions"]

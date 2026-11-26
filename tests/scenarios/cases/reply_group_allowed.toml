@@ -1,0 +1,10 @@
+name = "a commenter allowed by group membership resumes the ticket"
+include = ["_common.toml", "_ticket.toml", "_paused.toml", "_second_run_good.toml"]
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "dana", body = "Round to 2.", groups = ["factory-reviewers"] }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info", "mr_opened"]

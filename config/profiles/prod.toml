@@ -48,6 +48,7 @@ settings = { root = "/var/lib/factory/workspaces" }
 
 [plugins.notifier]
 adapter = "notifier.ticket_comment"
+settings = { mention_format = "[~{user}]" }
 
 [plugins.monitor]
 adapter = "monitor.fake"
@@ -118,6 +119,12 @@ model = ""
 [models.stages.grading]
 provider = "primary"
 model = ""
+[models.stages.respond]
+provider = "primary"
+model = ""
+
+[collaboration]
+factory_identity = ""
 
 [trace_store]
 backend = "s3"

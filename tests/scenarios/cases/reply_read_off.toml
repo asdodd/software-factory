@@ -1,0 +1,15 @@
+name = "with read_replies off, answers are not read and the ticket stays paused"
+include = ["_common.toml", "_ticket.toml", "_paused.toml"]
+[overrides]
+disable = ["jira_comments.read_replies"]
+
+[[steps]]
+human_comment = { ticket = "SIM-1", author = "bob", body = "Yes." }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["needs_info"]
+[[expect.tickets]]
+key = "SIM-1"
+paused = true

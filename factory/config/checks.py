@@ -20,10 +20,12 @@ MODEL_STAGES = {
     "review": ("review",),
     "intake": ("intake.email", "intake.gitlab_comments"),
     "grading": ("feedback.grading",),
+    "respond": ("mr.respond", "mr.auto_fix"),
 }
 
-ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source")
-FEATURE_PORTS = {"mailbox": ("intake.email",), "monitor": ("intake.monitoring", "monitoring"), "notifier": ("spec",)}
+ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source",
+                "notifier")
+FEATURE_PORTS = {"mailbox": ("intake.email",), "monitor": ("intake.monitoring", "monitoring")}
 TOOL_LOOP_HARNESSES = frozenset({"harness.builtin"})
 
 
@@ -108,6 +110,13 @@ def _check_one(label: str, cfg: FactoryConfig, features: FeatureStates, out: lis
             out.append(Diagnostic("error", f"{prefix}models.stages.{stage}.harness: unknown harness {sm.harness!r}"))
         elif sm.harness:
             _check_harness(prefix, sm.harness, cfg, out)
+    stages = cfg.models.stages
+    if features.on("review") and (stages.review.provider, stages.review.model) == (
+            stages.implement.provider, stages.implement.model):
+        out.append(Diagnostic("warning", f"{prefix}review uses the same provider and model as implement; "
+                                         "a different model avoids correlated blind spots"))
+    if (features.on("jira_comments.read_replies") or features.on("mr.read_comments")) and not cfg.collaboration.factory_identity:
+        out.append(Diagnostic("error", f"{prefix}collaboration.factory_identity is required to ignore the factory's own comments"))
     for channel, needs in (("jira", "jira_comments.read_replies"), ("mr", "mr.read_comments")):
         if features.on(needs) and rule_is_empty(effective_rule(cfg, channel)):
             out.append(Diagnostic(

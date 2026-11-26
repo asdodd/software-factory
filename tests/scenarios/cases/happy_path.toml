@@ -61,6 +61,7 @@ run = "frontend-bot"
 
 [expect]
 outcomes = ["mr_opened"]
+notified = [["mr_ready", ["carol", "alice"]]]
 [[expect.tickets]]
 key = "SIM-1"
 status = "In Review"
@@ -70,7 +71,7 @@ comments_contain = ["Ready for human review", "fake://web/portal/-/merge_request
 [expect.git]
 mrs = 1
 pushed_branches = ["ai/frontend-bot/SIM-1"]
-mr_description_contains = ["## What changed", "## Blast radius", "calc module only", "## How verified", "evidence/run.txt"]
+mr_description_contains = ["```plantuml", "component \"src", "## What changed", "## Blast radius", "calc module only", "## How verified", "evidence/run.txt"]
 [[expect.git.branch_files]]
 path = "web/portal"
 branch = "ai/frontend-bot/SIM-1"

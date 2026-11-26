@@ -1,0 +1,37 @@
+name = "a hard ticket waits for spec approval, then resumes with the spec"
+include = ["_common.toml", "_ticket.toml"]
+
+[[model]]
+stage = "triage"
+ticket = "SIM-1"
+content = { difficulty = "hard", reason = "needs design" }
+[[model]]
+stage = "spec"
+ticket = "SIM-1"
+content = "PRODUCT-SPEC: multiply two numbers.\nTECH-SPEC: add multiply() to calc.py."
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Implemented the spec." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+run = "frontend-bot"
+[[steps]]
+set_labels = { ticket = "SIM-1", add = ["ai-spec-approved"] }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["spec_review", "mr_opened"]
+notified = [["spec_review", ["carol", "alice"]], ["mr_ready", ["carol", "alice"]]]
+[expect.harness_observed]
+instructions_contain = ["## Approved spec", "TECH-SPEC: add multiply() to calc.py."]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
