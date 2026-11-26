@@ -2,29 +2,41 @@
 title Ports and adapters (core never imports adapters)
 skinparam componentStyle rectangle
 
-package "factory.cli" { [factory CLI] as CLI }
+package "factory.cli" {
+
+  [factory CLI] as CLI
+
+}
 package "factory.config" {
   [loader + schema + validate] as CFG
   [registry (alias | module:Class)] as REG
 }
-package "factory.features" { [feature table + dependency check] as FEAT }
+package "factory.features" {
+  [feature table + dependency check] as FEAT
+}
 package "factory.core" {
   [pipeline / state machine] as PIPE
   [readiness checklist] as READY
   [claim + push library] as PUSH
-  [dedupe + intake service] as INTAKE
+  [intake service + sources\nemail | gitlab | monitoring] as INTAKE
+  [collaboration loops\nJira replies | MR comments] as COLLAB
+  [feedback: metrics, grading,\nself-improvement] as FEED
   [budget wrapper] as BUDGET
   [workspace isolator\n(policy applied, history replaced)] as ISO
   [model gateway (loopback)\nopenai_chat | anthropic_messages] as GW
   [harness: builtin tool loop] as LOOP
   [harness: command (any CLI agent)] as CMD
+  [harness: cli_agent\nclaude | codex | cline, direct or via jam] as CLIA
 }
 package "bring your own" {
   [external agent CLI] as EXT
 }
-package "factory.access" { [PolicyAccessGuard] as GUARD }
-package "factory.skills.base" { [no-proprietary-files\n(+ global rules)] as SKILLS }
-
+package "factory.access" {
+  [PolicyAccessGuard] as GUARD
+}
+package "factory.skills.base" {
+  [no-proprietary-files\n(+ global rules)] as SKILLS
+}
 package "factory.ports (Protocols)" {
   interface TicketSystem
   interface GitHost
@@ -42,11 +54,24 @@ package "factory.ports (Protocols)" {
 }
 
 package "factory.adapters" {
-  package fake { [in-memory fakes\n(first-class, contract-tested)] as FAKES }
-  package jira { [JiraTicketSystem] as JIRA }
-  package gitlab { [GitlabGitHost (git argv)] as GITLAB }
-  package mail { [ImapSmtpMailbox] as MAIL }
-  package models { [OpenAICompatible / Replay] as MODELS }
+  package fake {
+    [in-memory fakes\n(first-class, contract-tested)] as FAKES
+  }
+  package jira {
+    [JiraTicketSystem] as JIRA
+  }
+  package gitlab {
+    [GitlabGitHost (git argv)] as GITLAB
+  }
+  package mail {
+    [ImapSmtpMailbox] as MAIL
+  }
+  package models {
+    [OpenAICompatible / Replay] as MODELS
+  }
+  package trace {
+    [local_fs | memory | s3] as TRACE
+  }
 }
 
 CLI --> CFG
@@ -61,11 +86,18 @@ CLI --> PIPE
 PIPE --> READY
 PIPE --> PUSH
 PIPE --> INTAKE
+PIPE --> COLLAB
+COLLAB --> TicketSystem
+COLLAB --> GitHost
+FEED --> TS
+FEED --> GitHost
 PIPE --> ISO
 ISO --> AccessGuard
 PIPE --> AgentHarness : run(task)
 LOOP ..|> AgentHarness
 CMD ..|> AgentHarness
+CLIA ..|> AgentHarness
+CLIA --> EXT : argv in Sandbox
 CMD --> EXT : argv in Sandbox
 EXT --> GW : only model route
 LOOP --> GW
@@ -89,5 +121,6 @@ JIRA ..|> TicketSystem
 GITLAB ..|> GitHost
 MAIL ..|> Mailbox
 MODELS ..|> ModelProvider
+TRACE ..|> TS
 note bottom of MODELS : any number of named providers;\nstages pick provider + model
 @enduml
