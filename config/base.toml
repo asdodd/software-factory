@@ -1,0 +1,197 @@
+# Global factory config. Applies to every agent and every repo.
+#
+# Layering, lowest to highest precedence:
+#   built-in defaults (factory/config/schema.py)
+#   -> this file
+#   -> config/profiles/<profile>.toml       (default profile: sim)
+#   -> environment: FACTORY__<SECTION>__<KEY>=value, e.g. FACTORY__LIMITS__MAX_ATTEMPTS=3
+#   -> CLI: --set limits.max_attempts=3, --enable review, --disable intake.email, --dry-run
+# Agent files (config/agents/*.toml) override only the sections in AgentOverrides;
+# environment and CLI still win over them.
+#
+# Unknown keys are errors. Secrets are never written here: use {env = "VAR"} or
+# {file = "/path"} references, resolved at runtime and redacted in logs.
+
+[global_rules]
+path = "factory/skills"        # stages, readiness checklist, PR templates, base skills
+version = "0.0.1"              # pinned; distributed through the internal mirror
+
+# Plugin discovery: config names an alias or a dotted path "package.module:Class".
+# Adding an adapter = add a module + an alias line (or use the dotted path directly).
+# Nothing is imported until a profile selects it AND its feature is enabled.
+[plugins.aliases]
+"ticket_system.fake"     = "factory.adapters.fake.ticket_system:FakeTicketSystem"
+"ticket_system.jira"     = "factory.adapters.jira.ticket_system:JiraTicketSystem"
+"git_host.fake"          = "factory.adapters.fake.git_host:FakeGitHost"
+"git_host.gitlab"        = "factory.adapters.gitlab.git_host:GitlabGitHost"
+"mailbox.fake"           = "factory.adapters.fake.mailbox:FakeMailbox"
+"mailbox.imap_smtp"      = "factory.adapters.mail.imap_smtp:ImapSmtpMailbox"
+"model_provider.scripted" = "factory.adapters.fake.model_provider:ScriptedModelProvider"
+"model_provider.replay"  = "factory.adapters.models.replay:ReplayModelProvider"
+"model_provider.openai_compatible" = "factory.adapters.models.openai_compatible:OpenAICompatibleProvider"
+"sandbox.local_dir"      = "factory.adapters.fake.sandbox:LocalDirSandbox"
+"access_guard.policy"    = "factory.access.guard:PolicyAccessGuard"
+"notifier.fake"          = "factory.adapters.fake.notifier:FakeNotifier"
+"notifier.ticket_comment" = "factory.core.notify:TicketCommentNotifier"
+"monitor.fake"           = "factory.adapters.fake.monitor:FakeMonitor"
+"accounting.memory"      = "factory.adapters.fake.accounting:MemoryAccounting"
+"accounting.sqlite"      = "factory.adapters.models.sqlite_accounting:SqliteAccounting"
+"state_store.memory"     = "factory.adapters.fake.state_store:MemoryStateStore"
+"state_store.sqlite"     = "factory.core.sqlite_state:SqliteStateStore"
+"clock.system"           = "factory.core.clock:SystemClock"
+"clock.fake"             = "factory.adapters.fake.clock:FakeClock"
+"id_source.uuid"         = "factory.core.clock:UuidIdSource"
+"id_source.sequential"   = "factory.adapters.fake.clock:SequentialIdSource"
+
+[plugins.access_guard]
+adapter = "access_guard.policy"   # the only guard; not swappable per profile in practice
+
+# Jira status and workflow mapping. Keys on the left are the factory's logical
+# states (fixed); values on the right are your Jira's names (config).
+# Profiles fill these in; they are left empty here on purpose.
+[workflow]
+claim_from = ["ready"]
+# [workflow.statuses]   ready = "...", in_progress = "...", spec_review = "...",
+#                       in_review = "...", needs_info = "...", blocked = "...",
+#                       stalled = "...", failed = "...", done = "..."
+# [workflow.transitions] optional: logical state -> native transition name
+# [workflow.fields]      logical field -> native custom field id:
+#                       lease_owner, lease_expires, repo, acceptance_criteria,
+#                       verify_steps, sponsor_team, source_ref, fingerprint
+# [workflow.link_types]  relates, blocks, duplicates -> native link type names
+
+[labels]           # global defaults; each agent may override
+ready = ""
+failed = ""
+needs_info = ""
+stalled = ""
+spec_approved = ""
+
+[collaboration]
+bot_identities = []   # other bots whose comments are always ignored
+[collaboration.allowed_commenters]   # empty = nobody; replies are logged and ignored
+users = []
+groups = []
+project_roles = []
+include_reporter = false
+include_assignee = false
+
+[output]
+mode = "merge_request"                  # merge_request | branch_only
+branch_pattern = "ai/{agent}/{ticket_key}"
+
+[jira_comments]
+post = true
+read_replies = true                     # requires post
+verbosity = "milestones"                # minimal | milestones | verbose
+status_comment_mode = "update_in_place" # append | update_in_place
+poll_interval_seconds = 300
+stall_timeout_hours = 72
+max_question_rounds = 3
+comment_rate_limit_per_hour = 20
+needs_info_action = "label"             # label | status
+lease_while_paused = "release"          # hold | release
+
+[mr]                                     # only valid with output.mode = merge_request
+read_comments = true
+respond = true                           # requires read_comments
+auto_fix = true                          # requires read_comments; own branch only
+resolve_threads = false                  # humans resolve threads
+poll_interval_seconds = 300
+inactivity_timeout_days = 14
+max_fix_rounds = 3
+apply_keyword = "/apply"
+template_path = ".gitlab/merge_request_templates/factory.md"
+
+[limits]
+lease_minutes = 120
+max_attempts = 2
+max_tokens_per_ticket = 2000000
+max_files_changed = 15                   # readiness "bounded scope" and PR gate
+max_diff_lines = 600
+max_denied_access_attempts = 5           # run stops and comments after this many
+
+[git]
+executable = "git"                       # fixed argv, explicit timeouts, no shell
+url_rewrites = []                        # [{match = "git@host:", replace = "https://host/"}]
+[git.clone]
+depth = 1
+timeout_seconds = 600
+[git.submodules]
+enabled = true
+recursive = true
+depth = 1
+jobs = 4
+on_failure = "fail"                      # fail | continue_without
+allow_modifications = false
+# [git.host_credentials."other-host.example"]
+# token = {env = "FACTORY_OTHER_HOST_TOKEN"}
+
+[trace_store]
+backend = "local_fs"                     # memory | local_fs | s3
+capture_level = "full"                   # metadata | full
+require_encryption = true                # s3 backend refuses to start without encryption
+flush_interval_seconds = 60
+[trace_store.redaction]
+extra_patterns = []                      # regexes, added to built-in secret scrubbers
+
+# Base skill: no proprietary files. `enabled` is honoured ONLY from this file;
+# profiles, agents, repo rules, env, and CLI cannot change it. Agents and repos
+# may add deny patterns, never remove these.
+[access_policy]
+enabled = true
+deny_patterns = ["proprietary"]
+match_on = ["path", "content"]
+case_insensitive = true
+content_scan_bytes = 8192
+mode = "strip"                           # strip | deny_read
+
+[intake]
+dedupe_window_days = 90
+[intake.email]
+allow_updates = false                    # email never updates tickets or agent context
+auto_label = false                       # false = draft-only, a human applies the label
+allowlisted_senders = []
+[intake.gitlab]
+keyword = "/followup"
+[intake.routing]
+enabled = false
+rules = []                               # [{agent = "docs-bot", components = ["docs"]}]
+
+[models.stages]                          # implementer and reviewer configured separately
+triage = ""
+spec = ""
+implement = ""
+review = ""
+intake = ""
+grading = ""
+[models.budgets]                         # 0 = no limit at this scope
+user_tokens_per_day = 0
+team_tokens_per_day = 0
+agent_tokens_per_day = 0
+requests_per_minute = 0
+
+[gates]
+max_comment_density = 0.15
+min_changed_line_coverage = 0.8
+min_mutation_score = 0.6
+protected_paths = [".gitlab-ci.yml", "CODEOWNERS", ".gitlab/**", "**/.lintrc*", "**/pyproject.toml"]
+
+# Feature toggles without a natural home elsewhere. See `factory features`.
+[features]
+"intake.jira" = true
+"intake.email" = false
+"intake.gitlab_comments" = false
+"intake.monitoring" = false
+readiness_gate = true
+triage = true
+spec = true
+implement = true
+review = true
+verify = true
+monitoring = false
+"feedback.metrics" = true
+"feedback.trace_store" = true
+"feedback.grading" = false
+"feedback.self_improvement" = false
+dry_run = false

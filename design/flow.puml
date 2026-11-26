@@ -1,0 +1,98 @@
+@startuml flow
+title Software Factory - end-to-end flow
+skinparam defaultFontSize 12
+skinparam activityDiamondBackgroundColor #FFF8DC
+
+|Intake (deterministic + model draft)|
+start
+fork
+  :Jira: human creates/labels ticket;
+fork again
+  :Email to bot alias\n(untrusted body, loop protection);
+  :Model drafts ticket\n(title, repo guess, AC, verdict);
+fork again
+  :GitLab comment keyword\n(/followup);
+fork again
+  :Monitoring finding;
+end fork
+:Idempotency check\n(message / thread / event id);
+if (Fingerprint match?\n(repo, file/symbol, summary)) then (yes)
+  :Link "relates" to existing ticket;
+  stop
+endif
+:Create ticket\n(reporter = requester, creator = bot);
+if (intake.routing on?) then (yes)
+  :Apply matching agent's ready label;
+endif
+
+|Readiness gate (deterministic)|
+:Check shared checklist\n(repo, AC, how to verify, bounded scope);
+if (Ready?) then (no)
+  :Comment numbered missing items;
+  :Email requester if from email\n("add info as a Jira comment");
+  stop
+endif
+if (Source trusted?\n(allowlist, auto_label on)) then (yes)
+  :Apply ready label;
+else (no)
+  :Draft verdict; human applies label\n(override recorded);
+endif
+
+|Agent worker (deterministic claim)|
+:Search with agent's neutral filter;
+:Claim: transition -> in_progress,\nassignee = service account, lease;
+:Re-read ticket;
+if (Still assignee AND filter matches\nAND readiness re-check passes?) then (no)
+  :Back off / bounce with comment;
+  stop
+endif
+
+|Model stages|
+if (triage) then (hard)
+  :Spec: product spec + tech spec;
+  :Post spec, transition -> spec_review,\nnotify humans;
+  |Human|
+  :Review spec;
+  if (Approved?) then (no)
+    :Comment changes;
+    note right: Jira reply loop\n(needs_info / resume / stall)
+    stop
+  endif
+  |Model stages|
+else (easy)
+endif
+:Clone + submodules (fixed argv git);
+:AccessGuard.scan_workspace\n(strip | deny_read);
+:Load base skills + global rules\n+ repo rules file;
+:Implement on agent branch\n(all tools via AccessGuard);
+:Lint + tests in sandbox;
+:Review (different model/context):\nstandards, blast radius, arch diff;
+:Verify: evidence from real code path;
+
+|PR gates (deterministic)|
+:Mechanical gates: lint, coverage,\nmutation, protected paths,\naccess policy, submodule pointers,\nMR template sections;
+if (Gates pass?) then (no)
+  if (attempts < max_attempts\nAND spend < cap?) then (yes)
+    :Retry implement;
+    detach
+  else (no)
+    :Transition -> failed, failed label,\nsummary comment;
+    stop
+  endif
+endif
+
+|Push library (deterministic, dry_run aware)|
+if (output.mode) then (merge_request)
+  :Push branch, open MR with template;
+  :Transition -> in_review;
+else (branch_only)
+  :Push branch;
+  :Jira comment: branch, compare link,\nMR-template summary;
+endif
+:Write trace + meta + artifacts\n(redacted, write-only creds);
+
+|Human|
+:Review MR / branch, CI runs\nwith target-branch lint & test config;
+:Human merges (AI never merges);
+stop
+@enduml

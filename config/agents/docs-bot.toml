@@ -1,0 +1,28 @@
+name = "docs-bot"
+enabled = true
+service_account = "svc-factory-docs"
+team = "docs"
+repos = ["docs/handbook"]
+extra_deny_patterns = ["export-controlled"]
+
+[filter]
+labels_any = ["ai-ready-docs"]
+labels_none = ["ai-failed"]
+projects = ["SIM"]
+components = ["docs"]
+
+[claim]
+order = ["created"]
+max_in_flight = 1
+
+[overrides.labels]
+ready = "ai-ready-docs"
+
+[overrides.output]
+mode = "branch_only"
+
+[overrides.features]
+spec = false
+"mr.read_comments" = false
+"mr.respond" = false
+"mr.auto_fix" = false
