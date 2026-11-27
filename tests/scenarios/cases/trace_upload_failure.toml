@@ -10,4 +10,5 @@ outcomes = ["mr_opened"]
 trace_pending_at_least = 2
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]

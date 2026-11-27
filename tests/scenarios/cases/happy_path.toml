@@ -2,6 +2,7 @@ name = "happy path: ready ticket becomes a verified MR"
 
 [[repos]]
 path = "web/portal"
+rules = { standards = ["STANDARDS.md"], evidence = ["evidence/*.txt"], commands = { test = [["python3", "-m", "unittest", "discover", "-s", "tests"]], verify = [["python3", "tests/test_calc.py"]] } }
 [repos.files]
 "src/calc.py" = """
 def add(a, b):
@@ -18,13 +19,6 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-"""
-".factory/rules.toml" = """
-standards = ["STANDARDS.md"]
-evidence = ["evidence/*.txt"]
-[commands]
-test = [["python3", "-m", "unittest", "discover", "-s", "tests"]]
-verify = [["python3", "tests/test_calc.py"]]
 """
 "STANDARDS.md" = "Functions are small and tested."
 
@@ -64,7 +58,8 @@ outcomes = ["mr_opened"]
 notified = [["mr_ready", ["carol", "alice"]]]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 lease_released = true
 assignee = "svc-factory-frontend"
 comments_contain = ["Ready for human review", "fake://web/portal/-/merge_requests/1"]

@@ -19,8 +19,8 @@ ticket_count = 1
 key = "SIM-1"
 reporter = "alice"
 summary = "Add multiply to calc"
-labels_include = ["ai-ready-frontend"]
-status = "In Review"
+labels_include = ["ai-ready-frontend", "ai-in-review"]
+status = "In Progress"
 field_contains = { acceptance_criteria = "multiply(a, b) returns the product", repo = "web/portal" }
 [expect.email]
 replies = 1

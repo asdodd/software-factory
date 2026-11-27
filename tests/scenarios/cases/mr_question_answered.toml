@@ -17,5 +17,6 @@ mr_replies = 1
 mr_replies_contain = ["multiply matches the existing add() naming."]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 comments_contain = ["Merge request feedback", "Answered a reviewer question."]

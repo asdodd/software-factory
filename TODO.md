@@ -7,21 +7,41 @@ Everything in the spec's five phases is built and tested against simulators. Thi
 Each of these has a working default today; it's a config change or a small code change once you decide.
 
 - [ ] **Jira version.** Comment idempotency uses comment properties, documented for Jira Server/Data Center 7.x and later. If your version ignores them, switch to a body marker.
-- [ ] **Mail sender authentication.** Does the internal mail server add `Authentication-Results` (DKIM or DMARC)? If yes, set `intake.email.require_authenticated_sender = true`. Without it, the allowlist trusts the `From:` header.
-- [ ] **Email to Jira user mapping.** Keep `intake.email.user_map` maintained by hand, or look users up by email in Jira (one extra API call per email)?
-- [ ] **GitLab follow-up project.** Keep one `intake.gitlab.default_project`, or map projects by GitLab group?
-- [ ] **Bounce status.** A not-ready ticket currently moves to `needs_info` and gets the needs-info label. Use a separate status, or a label only?
-- [ ] **Spec approval.** Approval is the `labels.spec_approved` label today. Keep the label, or make it a Jira transition?
-- [ ] **Stall status.** Stalled tickets go to `workflow.statuses.stalled` (`Open` in sim). Confirm.
-- [ ] **Overlapping agent filters.** `frontend-bot` and `docs-bot` can both match a ticket carrying both ready labels. Add each agent's ready label to the other's `labels_none`, or accept the warning?
-- [ ] **Repo rules location.** `.factory/rules.toml` in each repo. Keep it, or use an existing convention?
-- [ ] **Change requests with auto-fix off.** Today the agent replies that a human will make the change. Should it stay silent instead?
-- [ ] **Missing coverage or mutation setup.** Today it's a note in the MR. Should it fail the gate for some repos?
+- [ ] **GitLab follow-up project.** Keep one `intake.gitlab.default_project`, or map projects by GitLab group? (Ties in with the multi-repo intake suggestions below.)
+- [ ] **Multi-repo intake.** Pick from the suggestions below.
 - [ ] **Defaults chosen while you were offline:**
   - draft-only monitoring intake;
   - grader calibration needs 0.8 agreement with a tolerance of 1;
   - self-improvement may edit only `factory/skills/**` and `config/agents/**`;
   - the §8.3 limits and polling defaults.
+
+## Decided
+
+- [x] **Mail sender authentication.** The `From:` header is trusted (`require_authenticated_sender = false`). Duplicates go to the first ticket, with one reply and a "Related report" comment:
+  - the same Message-ID, compared without brackets or case;
+  - the same thread;
+  - the same request in a new thread, sent again or forwarded by someone else. "Same" means the same subject without `Re:`/`Fwd:` and the same body without quote markers or forward headers, within `intake.dedupe_window_days`.
+- [x] **Email to Jira user mapping.** The reporter is the Jira user found by the sender's address (`user/search`, exact and active match only, cached). `user_map` is gone. A sender with no Jira account is named in the description, and the factory is the reporter.
+- [x] **Status model.** Humans own the statuses (Open, In Progress, In Review, Complete). The factory claims from the ready status and only moves a ticket to In Progress, when implementation starts. Only `workflow.statuses.ready` and `in_progress` remain.
+- [x] **Bounce status.** Label only (`labels.needs_info`). The status is untouched; a human removes the label once the ticket is fixed.
+- [x] **Spec approval.** Kept as the `labels.spec_approved` label. A posted spec gets `labels.spec_review` while it waits.
+- [x] **Stall status.** The ticket stays In Progress and gets `labels.stalled`.
+- [x] **Labels in config.** Every label is in `[labels]`, with defaults in `config/base.toml`: ready, claimed, needs_info, spec_review, spec_approved, in_review, blocked, failed, stalled. Any value may contain `{agent}`.
+- [x] **Overlapping agent filters.** Each agent's lock label (`ai-claimed-{agent}`) keeps two agents off the same ticket. An agent that sees another agent's lock after adding its own backs off before taking a lease, so at most one wins. Tickets with any state label are never claimed as new work.
+- [x] **Repo rules location.** `.factory/rules.toml` is gone, so nothing is added to target repos. Optional per-repo settings live in the factory's config under `[repos."group/name"]`.
+- [x] **Change requests with auto-fix off.** The agent always replies in the thread that a human will make the change (even with `mr.respond` off), notes it on the Jira ticket, and counts it (`mr_changes_left_for_human`).
+- [x] **Missing coverage or mutation setup.** Repos own their coverage, CI and mutation tooling, and the factory no longer notes "not measured". A base skill tells the agent to find and run the repo's own tooling. Factory skills are the base; each repo's `AGENTS.md`, `CLAUDE.md` and skills override them, except the restricted-files skill, the process rules and the mechanical gates. A repo's CI file counts as "verification known" for readiness.
+
+## Multi-repo intake: suggestions
+
+A bug often needs the app, the product quality repo and the shared config repo. A ticket can already name several repos in its `repo` field. Each repo that changes gets its own branch and MR, and untouched repos are skipped. What's missing is filling that field in well at intake, and handling the MRs as a set.
+
+1. **Repo sets by issue type or component (recommended first).** Config such as `[intake.repo_sets] Bug = ["web/app", "qa/product-quality", "platform/shared-config"]`. Intake puts the whole set in `repo`, and the agent changes only what the ticket needs. Deterministic and cheap.
+2. **Let the intake drafter choose several repos.** The draft prompt returns `repos: [...]`, limited to known repos and merged with the repo set. This catches tickets that need only the app plus config.
+3. **One agent per product, not per repo.** An agent's `repos` must cover every repo a ticket names, or the ticket bounces as out of scope. Give the agent that handles the app all three repos.
+4. **A base skill for bugs.** For example: "For a bug, add a regression test in the product quality repo, and change shared config only through existing keys." It lives in `factory/skills/base`, so no repo changes.
+5. **Merge order and linking.** The shared config MR usually has to merge first. Add a per-repo `merge_order` and a "merge after" line in each MR description. Later, a label or merge train can merge the set together (see Known gaps).
+6. **Readiness for bugs.** Optionally require that a bug ticket names the product quality repo, so a regression test is part of the change.
 
 ## To go live
 
@@ -31,7 +51,8 @@ See [design/GO_LIVE.md](design/GO_LIVE.md) for the exact keys.
 - [ ] Create the Jira custom fields: `lease_owner`, `lease_expires`, `repo`, `acceptance_criteria`, `verify_steps`, `sponsor_team`, `source_ref`, `fingerprint`. Then map their ids in `[workflow.fields]`.
 - [ ] Issue service accounts and tokens: Jira, GitLab, the model endpoint, S3 write-only and S3 read-only credentials.
 - [ ] Write real agent definitions in `config/agents/` (the shipped ones are `SIM` examples), and fill in `allowed_commenters` and `[notifications]`.
-- [ ] Add a `.factory/rules.toml` to each target repo: lint, test and verify commands, standards files, evidence globs, and optionally coverage and mutation reports.
+- [ ] Optional: add `[repos."group/name"]` entries to the factory config for repos whose commands the factory should re-run as gates (lint, test, verify, standards, evidence, coverage and mutation reports). Nothing is added to the target repos.
+- [ ] Create the labels in `[labels]` if your Jira restricts labels, and give people a board filter on the state labels.
 - [ ] Prepare the S3 bucket: versioning or Object Lock, lifecycle expiry per classification rules, a policy that denies unencrypted puts, and no delete rights for either credential.
 - [ ] In GitLab, protect branches and add code owners for lint config, test config and CI files. CI must use the target branch's configuration.
 - [ ] Install `git` 2.20 or later on the worker box, and `claude`, `codex`, `cline` and `jam` if those harnesses are used.

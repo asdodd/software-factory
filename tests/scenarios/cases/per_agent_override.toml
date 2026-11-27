@@ -52,8 +52,10 @@ outcomes = ["spec_review", "branch_pushed"]
 notifications = 2
 [[expect.tickets]]
 key = "SIM-1"
-status = "Spec Review"
+status = "Ready for AI"
+labels_include = ["ai-spec-review"]
 comments_contain = ["Spec ready for review", "Product spec"]
 [[expect.tickets]]
 key = "SIM-2"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]

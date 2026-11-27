@@ -1,0 +1,37 @@
+name = "a ticket another agent has locked is not claimed, and a ticket with a state label is not claimed as new work"
+include = ["_common.toml", "_good_change.toml"]
+agent_files = ["agents/alpha-bot.toml", "agents/beta-bot.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready", "ai-claimed-beta-bot"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+[[tickets]]
+key = "SIM-2"
+summary = "Add divide to calc"
+status = "Ready for AI"
+labels = ["ai-ready", "ai-needs-info"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- divide"
+
+[[steps]]
+run = "alpha-bot"
+
+[expect]
+outcomes = []
+[[expect.tickets]]
+key = "SIM-1"
+labels_exclude = ["ai-claimed-alpha-bot"]
+bot_comments = 0
+[[expect.tickets]]
+key = "SIM-2"
+labels_exclude = ["ai-claimed-alpha-bot"]
+bot_comments = 0
+[expect.git]
+no_pushes = true

@@ -35,6 +35,10 @@ class FakeHarness:
     def attach(self, key, name, data):
         return self.ts.attach(key, name, data).id
 
+    def add_user(self, name, email, active=True):
+        if active:
+            self.ts.add_user(email, name)
+
 
 class JiraHarness:
     native = "jira"
@@ -56,6 +60,9 @@ class JiraHarness:
 
     def attach(self, key, name, data):
         return self.em.attach(key, name, data)
+
+    def add_user(self, name, email, active=True):
+        self.em.users[name] = (email, active)
 
 
 @pytest.fixture(params=["fake", "jira"])
@@ -132,6 +139,17 @@ def test_update_labels_links_attachments(h):
     aid = h.attach("SIM-1", "notes.txt", b"hello")
     assert [a.filename for a in h.ts.get("SIM-1").attachments] == ["notes.txt"]
     assert h.ts.get_attachment("SIM-1", aid) == b"hello"
+
+
+def test_find_user_by_email_is_exact_and_active_only(h):
+    h.add_user("alice", "Alice@Team.example")
+    h.add_user("malice", "malice@team.example")
+    h.add_user("gone", "gone@team.example", active=False)
+    assert h.ts.find_user_by_email("alice@team.example").id == "alice"
+    assert h.ts.find_user_by_email("ALICE@team.example").id == "alice"
+    assert h.ts.find_user_by_email("lice@team.example") is None
+    assert h.ts.find_user_by_email("gone@team.example") is None
+    assert h.ts.find_user_by_email("nobody@team.example") is None
 
 
 def test_jira_specifics():

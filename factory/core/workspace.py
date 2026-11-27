@@ -31,6 +31,15 @@ class LineStats:
     added_lines: tuple[str, ...]
 
 
+CI_FILES = (".gitlab-ci.yml", ".github/workflows", "Jenkinsfile", ".circleci/config.yml", "azure-pipelines.yml",
+            "bitbucket-pipelines.yml", ".drone.yml", ".travis.yml")
+
+
+def has_ci(repo_root: Path) -> bool:
+    """The repo runs its own CI (lint, tests, coverage, mutation) on merge requests."""
+    return any((repo_root / name).exists() for name in CI_FILES)
+
+
 def local_git() -> Git:
     return Git(GitOptions(clone_depth=0, submodules_enabled=False, author_name="factory-baseline",
                           author_email="baseline@factory.invalid", allow_protocols="file"))

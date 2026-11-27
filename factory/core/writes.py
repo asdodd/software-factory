@@ -88,6 +88,9 @@ class Writes:
         return native
 
     def transition(self, key: TicketKey, status: LogicalStatus) -> None:
+        """Humans own the workflow; the factory only ever moves a ticket to in progress."""
+        if status is not LogicalStatus.IN_PROGRESS:
+            raise Conflict(f"the factory does not set status {status.value}; only humans do")
         native = self.native_status(status)
         if self.dry_run:
             return self._intend("transition", {"ticket": key, "to": native})

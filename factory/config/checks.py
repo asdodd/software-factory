@@ -147,7 +147,8 @@ def _check_harness(prefix: str, name: str, cfg: FactoryConfig, out: list) -> Non
 
 
 OPTIONAL_EMPTY = frozenset({"ca_bundle_path", "session_token", "prefix", "kms_key_id", "region", "default_project",
-                            "default_issue_type", "spec_approved", "stalled", "template_path"})
+                            "default_issue_type", "spec_approved", "spec_review", "stalled", "template_path"})
+STATUS_KEYS = ("ready", "in_progress")
 
 
 def _empty_values(data: object, path: str = "") -> list[str]:
@@ -179,6 +180,14 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
                         continue
                     out.append(Diagnostic("error", f"{path} is empty in profile {loaded.profile}: fill it in to go live"))
     _check_one("", cfg, loaded.features, out)
+    for key in cfg.workflow.statuses:
+        if key not in STATUS_KEYS:
+            out.append(Diagnostic("error", f"workflow.statuses.{key}: the factory only claims from ready and moves "
+                                           "tickets to in_progress; every other state is a label"))
+    for key in cfg.workflow.claim_from:
+        if key not in STATUS_KEYS:
+            out.append(Diagnostic("error", f"workflow.claim_from: unknown status {key!r}"))
+    locks: dict[str, str] = {}
     for name, agent in loaded.agents.items():
         if not agent.enabled:
             continue
@@ -187,8 +196,22 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
             out.append(Diagnostic("error", f"agent {name}: service_account is required"))
         if bool(agent.filter.native_query) != bool(agent.filter.native_adapter):
             out.append(Diagnostic("error", f"agent {name}: filter.native_query and filter.native_adapter go together"))
-        if not loaded.agent_configs[name].labels.ready:
+        labels = loaded.agent_configs[name].labels
+        if not labels.ready:
             out.append(Diagnostic("error", f"agent {name}: labels.ready is required"))
+        if not labels.claimed:
+            out.append(Diagnostic("error", f"agent {name}: labels.claimed (the lock label) is required"))
+        elif labels.claimed in locks:
+            out.append(Diagnostic("error", f"agents {locks[labels.claimed]} and {name} share the lock label "
+                                           f"{labels.claimed!r}; put {{agent}} in labels.claimed"))
+        else:
+            locks[labels.claimed] = name
+        if bool(labels.spec_review) != bool(labels.spec_approved) and loaded.agent_features[name].on("spec"):
+            out.append(Diagnostic("error", f"agent {name}: labels.spec_review and labels.spec_approved go together"))
+        state = labels.state_labels()
+        if labels.ready in state or len(set(state)) != len(state):
+            out.append(Diagnostic("error", f"agent {name}: each state label must be distinct and differ from "
+                                           "labels.ready"))
 
     ts = cfg.trace_store
     if loaded.features.on("feedback.trace_store") and ts.backend == "s3":
@@ -212,5 +235,6 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
             if rule.agent not in loaded.agents:
                 out.append(Diagnostic("error", f"intake.routing.rules[{i}].agent: unknown agent {rule.agent!r}"))
     for x, y in overlapping_agents(loaded.agents):
-        out.append(Diagnostic("warning", f"agents {x} and {y} have filters that may overlap; leases prevent double claims"))
+        out.append(Diagnostic("warning", f"agents {x} and {y} have filters that may overlap; their lock labels "
+                                         "keep them from working the same ticket at once"))
     return out

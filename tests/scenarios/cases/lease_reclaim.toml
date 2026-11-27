@@ -33,7 +33,8 @@ run = "frontend-bot"
 outcomes = ["mr_opened"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 comments_contain = ["Reclaimed after lease expiry"]
 [[expect.tickets]]
 key = "SIM-3"

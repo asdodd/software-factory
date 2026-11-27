@@ -8,6 +8,7 @@ from factory.ports.types import (
     Cursor,
     LinkKind,
     Page,
+    Principal,
     Ticket,
     TicketDraft,
     TicketFilter,
@@ -49,6 +50,11 @@ class TicketSystem(Protocol):
     def link(self, source: TicketKey, target: TicketKey, kind: LinkKind) -> None: ...
 
     def set_labels(self, key: TicketKey, add: Iterable[str] = (), remove: Iterable[str] = ()) -> Ticket: ...
+
+    def find_user_by_email(self, email: str) -> Principal | None:
+        """The one active user with exactly this email address (any case), or
+        None when there is no such user or several."""
+        ...
 
     def get_attachment(self, key: TicketKey, attachment_id: str) -> bytes:
         """Raw bytes."""

@@ -19,5 +19,5 @@ run = "alpha-bot"
 outcomes = ["mr_opened"]
 [[expect.tickets]]
 key = "SIM-1"
-labels_include = ["ai-ready"]
-status = "In Review"
+labels_include = ["ai-ready", "ai-in-review"]
+status = "In Progress"

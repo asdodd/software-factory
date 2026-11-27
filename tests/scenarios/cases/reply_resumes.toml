@@ -10,7 +10,8 @@ run = "frontend-bot"
 outcomes = ["needs_info", "mr_opened"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 paused = false
 labels_exclude = ["ai-needs-info"]
 comments_contain = ["Needs more information", "Resumed", "Ready for human review"]

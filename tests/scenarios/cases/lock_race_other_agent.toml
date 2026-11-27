@@ -1,0 +1,36 @@
+name = "two agents lock the same ticket at once: the one that sees a rival lock backs off before taking a lease"
+include = ["_common.toml", "_good_change.toml"]
+agent_files = ["agents/alpha-bot.toml", "agents/beta-bot.toml"]
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply"
+
+# beta-bot's lock lands right after alpha-bot adds its own.
+[[hooks]]
+after = "labels"
+ticket = "SIM-1"
+action = "set_labels"
+add = ["ai-claimed-beta-bot"]
+
+[[steps]]
+run = "alpha-bot"
+
+[expect]
+outcomes = []
+metrics = { claim_lost = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+status = "Ready for AI"
+labels_include = ["ai-claimed-beta-bot"]
+labels_exclude = ["ai-claimed-alpha-bot"]
+lease_released = true
+bot_comments = 0
+[expect.git]
+no_pushes = true
+mrs = 0

@@ -31,11 +31,11 @@ ticket_count = 2
 outcomes = ["branch_pushed"]
 [[expect.tickets]]
 key = "SIM-1"
-labels_include = ["ai-ready-docs"]
-status = "In Review"
+labels_include = ["ai-ready-docs", "ai-in-review"]
+status = "In Progress"
 assignee = "svc-factory-docs"
 [[expect.tickets]]
 key = "SIM-2"
 labels_exclude = ["ai-ready-frontend", "ai-ready"]
-status = "Open"
+status = "Ready for AI"
 comments_contain = ["proposed ready", "the sender is not trusted"]

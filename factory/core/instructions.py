@@ -63,6 +63,9 @@ def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequ
         lines = _commands(rules)
         if lines:
             parts += ["## Repo commands", *lines]
+    if not any(_commands(r) for r in ([rr for _, _, rr in repos] if repos else [rules])):
+        parts += ["## Repo commands",
+                  "None are configured in the factory. Find and run the repo's own tooling, as the base skill says."]
     if standards:
         parts += ["## Repo standards", "Read and follow these files:", *(f"- {s}" for s in standards)]
     if attachments_dir:

@@ -3,9 +3,9 @@ include = ["_ticket.toml", "_good_change.toml"]
 
 [[repos]]
 path = "web/portal"
+rules = { commands = { test = [["python3", "-c", "print('ok')"]] } }
 [repos.files]
 "src/calc.py" = "def add(a, b):\n    return a + b\n"
-".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
 
 [settings.limits]
 max_tokens_per_ticket = 5000
@@ -22,9 +22,9 @@ run = "frontend-bot"
 outcomes = ["failed"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "Open"
+status = "In Progress"
 labels_include = ["ai-failed"]
-labels_exclude = ["ai-ready-frontend"]
+labels_exclude = ["ai-claimed-frontend-bot"]
 lease_released = true
 comments_contain = ["Spend cap reached", "would exceed its cap of 5000 tokens"]
 [expect.git]

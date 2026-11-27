@@ -16,7 +16,7 @@ outcomes = []
 metrics = { claim_lost = 1 }
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Progress"
+status = "Ready for AI"
 lease_owner = "frontend-bot:other-worker"
 bot_comments = 0
 [expect.git]

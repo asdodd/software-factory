@@ -41,11 +41,13 @@ run_all = true
 outcomes = ["branch_pushed", "mr_opened"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 assignee = "svc-factory-frontend"
 [[expect.tickets]]
 key = "SIM-2"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 assignee = "svc-factory-docs"
 [expect.git]
 mrs = 1

@@ -7,6 +7,7 @@ Precedence, lowest to highest: built-in defaults, config/base.toml, profile,
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import json
 import os
@@ -178,6 +179,13 @@ def _merge_layers(layers: Sequence[Layer]) -> dict:
     return merged
 
 
+def with_agent_labels(config: FactoryConfig, agent: str) -> FactoryConfig:
+    """Replace {agent} in every label value with the agent's name."""
+    labels = config.labels
+    resolved = {f.name: getattr(labels, f.name).replace("{agent}", agent) for f in dataclasses.fields(labels)}
+    return dataclasses.replace(config, labels=dataclasses.replace(labels, **resolved))
+
+
 def load(
     root: Path | str,
     profile: str | None = None,
@@ -226,7 +234,7 @@ def load(
         layers = [*lower, alayer, *upper]
         amerged = _merge_layers(layers)
         try:
-            agent_configs[agent.name] = build(FactoryConfig, amerged, root="")
+            agent_configs[agent.name] = with_agent_labels(build(FactoryConfig, amerged, root=""), agent.name)
         except ConfigError as exc:
             problems.extend(f"agent {agent.name}: {p}" for p in exc.problems)
             continue

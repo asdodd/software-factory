@@ -21,7 +21,7 @@ def _fmt(t: datetime) -> str:
 
 class JiraEmulator:
     def __init__(self, base_url: str = "https://jira.sim.invalid", statuses=("Open", "Ready", "In Progress", "Done"),
-                 transitions: dict | None = None, groups: dict | None = None) -> None:
+                 transitions: dict | None = None, groups: dict | None = None, users: dict | None = None) -> None:
         self.base_url = base_url
         self.issues: dict[str, dict] = {}
         self.comments: dict[str, list[dict]] = {}
@@ -30,6 +30,7 @@ class JiraEmulator:
         self.statuses = statuses
         self.transitions = transitions
         self.groups = groups or {}
+        self.users = users or {}  # name -> (email, active)
         self.requests: list[tuple[str, str, object]] = []
         self.auth_seen: set[str] = set()
         self._seq = 0
@@ -177,6 +178,11 @@ class JiraEmulator:
         if method == "POST" and path == f"{api}/issueLink":
             self.links.append(data)
             return self._ok(None, 201)
+        if method == "GET" and path == f"{api}/user/search":
+            q = query["username"].lower()
+            found = [{"name": n, "displayName": n, "emailAddress": e, "active": a}
+                     for n, (e, a) in sorted(self.users.items()) if q in n.lower() or q in e.lower()]
+            return self._ok(found[:int(query.get("maxResults", 50))])
         if method == "GET" and path == f"{api}/user":
             name = query["username"]
             return self._ok({"name": name, "groups": {"items": [{"name": g} for g in self.groups.get(name, [])]}})

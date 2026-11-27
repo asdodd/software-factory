@@ -1,0 +1,44 @@
+name = "a repo with no factory-side settings: the agent uses the repo's own tooling, the repo's CI counts as verification, and no repo file is needed"
+
+[[repos]]
+path = "web/portal"
+[repos.files]
+"src/calc.py" = "def add(a, b):\n    return a + b\n"
+".gitlab-ci.yml" = "test:\n  script: python3 -m unittest\n"
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply to calc"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+[tickets.fields]
+repo = "web/portal"
+acceptance_criteria = "- multiply(a, b) returns the product"
+
+[[model]]
+stage = "triage"
+content = { difficulty = "easy", reason = "small change" }
+[[model]]
+stage = "review"
+content = { summary = "Looks fine.", blast_radius = "local", merge_danger = "low", architecture_diff = "none" }
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+instructions_contain = ["Find and run the repo's own tooling", "Where they\n   conflict with a base skill, follow the repo."]
+[expect.git]
+mrs = 1
+mr_description_contains = ["the repo's CI checks the merge request"]
+mr_description_exclude = ["not measured"]

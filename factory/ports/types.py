@@ -42,17 +42,12 @@ class Principal:
 
 
 class LogicalStatus(enum.Enum):
-    """Pipeline states. Config maps each to a native ticket-system status."""
+    """The statuses the factory knows. Humans own the workflow: the factory
+    claims from READY and may move a ticket to IN_PROGRESS, nothing else.
+    Every other state is a label (see LabelsConfig)."""
 
     READY = "ready"
     IN_PROGRESS = "in_progress"
-    SPEC_REVIEW = "spec_review"
-    IN_REVIEW = "in_review"
-    NEEDS_INFO = "needs_info"
-    BLOCKED = "blocked"
-    STALLED = "stalled"
-    FAILED = "failed"
-    DONE = "done"
 
 
 class LinkKind(enum.Enum):

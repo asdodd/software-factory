@@ -20,7 +20,7 @@ from factory.config.loader import LoadedConfig
 from factory.core import readiness
 from factory.core.stateindex import Index, Records
 from factory.core.writes import Note, Writes
-from factory.ports.types import LogicalStatus, Principal, Ticket, TicketDraft, TicketFilter
+from factory.ports.types import Principal, Ticket, TicketDraft, TicketFilter
 
 _WS = re.compile(r"\s+")
 _NOISE = re.compile(r"[^a-z0-9 ]+")
@@ -122,7 +122,6 @@ class IntakeService:
         labeled = result.ready and event.trusted and event.auto_label
         if labeled:
             self.writes.set_labels(ticket.key, add=[label])
-            self.writes.transition(ticket.key, LogicalStatus.READY)
             self.writes.comment(ticket.key, "claimed", Note("Ready", "ready", done=f"Marked ready ({label})."),
                                 f"intake-ready:{ticket.key}")
         elif result.ready:
@@ -130,7 +129,7 @@ class IntakeService:
             self.writes.comment(ticket.key, "bounced", Note(
                 "Created: proposed ready", "awaiting a human",
                 done=f"The readiness check passed, but {why}, so a human confirms.",
-                next=f"If you agree, apply the {label} label and move it to the ready status."),
+                next=f"If you agree, apply the {label} label."),
                 f"intake-proposed:{ticket.key}")
         else:
             self.writes.comment(ticket.key, "bounced", Note(

@@ -10,6 +10,7 @@ run = "app-bot"
 outcomes = ["blocked"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "Blocked"
+status = "Ready for AI"
+labels_include = ["ai-blocked"]
 lease_released = true
 comments_contain = ["A submodule could not be checked out: vendor/core", "Paths: vendor/core"]

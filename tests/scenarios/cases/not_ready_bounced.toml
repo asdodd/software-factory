@@ -17,9 +17,9 @@ run = "frontend-bot"
 outcomes = ["bounced"]
 [[expect.tickets]]
 key = "SIM-2"
-status = "Waiting for Info"
-labels_include = ["ai-needs-info"]
-labels_exclude = ["ai-ready-frontend"]
+status = "Ready for AI"
+labels_include = ["ai-needs-info", "ai-ready-frontend"]
+labels_exclude = ["ai-claimed-frontend-bot"]
 lease_released = true
 comments_contain = ["Not ready", "1. Acceptance criteria are not stated."]
 [expect.git]

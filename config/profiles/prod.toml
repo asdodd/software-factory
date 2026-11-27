@@ -70,16 +70,12 @@ adapter = "id_source.uuid"
 [workflow]
 ticket_url_template = ""
 
+# Only two statuses matter: humans own the rest of the workflow (e.g. In Review,
+# Complete). The factory claims from "ready" (e.g. "Open") and moves a ticket
+# to "in_progress" (e.g. "In Progress").
 [workflow.statuses]
 ready = ""
 in_progress = ""
-spec_review = ""
-in_review = ""
-needs_info = ""
-blocked = ""
-stalled = ""
-failed = ""
-done = ""
 
 [workflow.fields]
 lease_owner = ""
@@ -96,12 +92,7 @@ relates = ""
 blocks = ""
 duplicates = ""
 
-[labels]
-ready = ""
-failed = ""
-needs_info = ""
-stalled = ""
-spec_approved = ""
+# Labels default in config/base.toml; override any of them here.
 
 [models.stages.triage]
 provider = "primary"

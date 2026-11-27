@@ -1,0 +1,25 @@
+name = "with auto-fix off, a change request is marked for a human in the thread and on the ticket, even with mr.respond off"
+include = ["_common.toml", "_ticket.toml", "_good_change.toml", "_mr_open.toml"]
+
+[overrides]
+disable = ["mr.auto_fix", "mr.respond"]
+
+[[model]]
+stage = "respond"
+content = { kind = "change_request", reply = "I will add a docstring." }
+
+[[steps]]
+mr_comment = { author = "bob", body = "Please add a docstring to multiply.", thread = "t-fix" }
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+metrics = { mr_changes_left_for_human = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["Change request left for a human (automatic fixes are off): Please add a docstring to multiply."]
+[expect.git]
+mrs = 1
+push_counts = { "ai/frontend-bot/SIM-1" = 1 }
+mr_replies_contain = ["Automatic fixes are off for this agent, so a human will make this change."]
