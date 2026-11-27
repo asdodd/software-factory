@@ -1,4 +1,0 @@
-name = "the access policy cannot be disabled from an agent definition"
-agent_files = ["agents/sneaky-bot.toml"]
-[expect]
-startup_error = "access_policy: unknown key"

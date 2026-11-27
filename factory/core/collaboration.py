@@ -150,7 +150,8 @@ def poll_mrs(w: Worker) -> list[RunReport]:
         info["last_poll"] = w.clock.now().isoformat()
         repo = RepoRef("", info["repo"], w.cfg.git.branches.get(info["repo"], w.cfg.git.default_branch))
         mr = w.git.get_merge_request(repo, info["id"])
-        ticket = w.tickets.get(key)
+        tkey = info.get("ticket", key)
+        ticket = w.tickets.get(tkey)
         if mr.state is not MergeRequestState.OPEN:
             stop_watching(w, key, f"The merge request was {mr.state.value}.", info, mr.state.value)
             continue
@@ -164,18 +165,20 @@ def poll_mrs(w: Worker) -> list[RunReport]:
             if is_own(w.cfg, w.service_accounts, comment.author):
                 continue
             if not allowed(w, comment.author, ticket, "mr"):
-                _ignore(w, f"mr:{key}", comment.author, "author not allowed")
+                _ignore(w, f"mr:{tkey}", comment.author, "author not allowed")
                 continue
             info["last_activity"] = w.clock.now().isoformat()
             events.extend(handle_comment(w, ticket, repo, info, comment, reports))
         w.mrs.put(key, info)
         if events:
-            w.writes.comment(key, "mr_feedback", Note("Merge request feedback", "in review", done="\n".join(events)),
+            w.writes.comment(tkey, "mr_feedback", Note("Merge request feedback", "in review", done="\n".join(events)),
                              f"mrfb:{key}:{info['cursor']}")
     return reports
 
 
 def stop_watching(w: Worker, key: str, why: str, info: dict, state: str = "inactive") -> None:
+    """key is the MR record: the ticket key, or ticket#repo for a ticket's other repos."""
+    tkey = info.get("ticket", key)
     w.mrs.delete(key)
     w.mr_index.remove(key)
     w.metrics.incr("mr_outcomes", state=state, agent=w.name)
@@ -184,12 +187,12 @@ def stop_watching(w: Worker, key: str, why: str, info: dict, state: str = "inact
         try:
             writer.append_outcome(OutcomeRecord(
                 info["run_id"], w.clock.now(), f"mr_{state}",
-                {"mr": info["id"], "fix_rounds": int(info.get("fix_rounds", 0))}, w.name, key,
+                {"mr": info["id"], "fix_rounds": int(info.get("fix_rounds", 0))}, w.name, tkey,
                 datetime.fromisoformat(info["run_started"])))
             writer.flush()
         except Exception:  # noqa: BLE001 - trace storage never blocks the loop
             log.exception("could not record the MR outcome for %s", key)
-    w.writes.comment(key, "mr_feedback", Note("Stopped watching the merge request", "in review", done=why,
+    w.writes.comment(tkey, "mr_feedback", Note("Stopped watching the merge request", "in review", done=why,
                                               details=f"Fix rounds used: {info.get('fix_rounds', 0)}."),
                      f"mrstop:{key}:{info['id']}")
 
@@ -204,7 +207,8 @@ def handle_comment(w: Worker, ticket: Ticket, repo: RepoRef, info: dict, comment
         w.writes.mr_reply(repo, info["id"], comment.thread_id, text, f"{comment.id}:{suffix}")
 
     def fix(apply: list[dict]) -> RunReport:
-        request = FixRequest(info["repo"], info["id"], info["branch"], comment.thread_id, body, comment.id, apply)
+        request = FixRequest(info["repo"], info["id"], info["branch"], comment.thread_id, body, comment.id, apply,
+                             info.get("record", ""))
         return w.process(ticket, "fix", fix=request)
 
     if body.split()[0:1] == [mr_cfg.apply_keyword]:

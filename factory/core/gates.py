@@ -6,7 +6,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
-from pathlib import Path
 
 from factory.config.schema import FactoryConfig, RepoRules
 from factory.core.workspace import Change, LineStats
@@ -48,7 +47,9 @@ def ticket_flag(ticket: Ticket, name: str) -> bool:
 
 
 def check_changes(found: Sequence[Change], stats: LineStats, ticket: Ticket, cfg: FactoryConfig, rules: RepoRules,
-                  submodule_paths: Sequence[str], guard, copy_root: Path) -> GateReport:
+                  submodule_paths: Sequence[str], size: bool = True) -> GateReport:
+    """Gates for one repo's change. size=False leaves the size limits to check_size
+    over the whole ticket (several repos)."""
     report = GateReport()
     gates = cfg.gates
     paths = [c.path for c in found]
@@ -61,15 +62,6 @@ def check_changes(found: Sequence[Change], stats: LineStats, ticket: Ticket, cfg
             report.failures.append(f"protected path changed: {c.path}")
         if c.is_symlink:
             report.failures.append(f"symlinks may not be added or changed: {c.path}")
-    decision = guard.check_diff_paths(paths)
-    if not decision.allowed:
-        report.failures.append("the change touches a path restricted by the access policy")
-    for c in found:
-        source = copy_root / c.path
-        if (c.status != "D" and source.is_file() and not source.is_symlink()
-                and guard.content_matches(source.read_bytes())):
-            report.failures.append("the change adds content carrying a restricted marking")
-            break
     for sub in submodule_paths:
         touched = [p for p in paths if p == sub or p.startswith(sub.rstrip("/") + "/")]
         if not touched:
@@ -85,10 +77,8 @@ def check_changes(found: Sequence[Change], stats: LineStats, ticket: Ticket, cfg
     for c in found:
         if c.status == "D" and glob_match(c.path, gates.test_file_patterns):
             report.failures.append(f"test file deleted: {c.path}")
-    if len(found) > cfg.limits.max_files_changed:
-        report.failures.append(f"{len(found)} files changed (limit {cfg.limits.max_files_changed})")
-    if stats.added + stats.deleted > cfg.limits.max_diff_lines:
-        report.failures.append(f"{stats.added + stats.deleted} diff lines (limit {cfg.limits.max_diff_lines})")
+    if size:
+        report.extend(check_size(len(found), stats.added + stats.deleted, cfg))
     code_lines = [line.strip() for line in stats.added_lines if line.strip()]
     if len(code_lines) >= 10:
         comments = sum(1 for line in code_lines if line.startswith(COMMENT_PREFIXES))
@@ -98,6 +88,15 @@ def check_changes(found: Sequence[Change], stats: LineStats, ticket: Ticket, cfg
     skipped = [line for line in stats.added_lines if any(m in line for m in SKIP_MARKERS)]
     if skipped:
         report.failures.append(f"{len(skipped)} added line(s) skip or disable tests")
+    return report
+
+
+def check_size(files: int, lines: int, cfg: FactoryConfig) -> GateReport:
+    report = GateReport()
+    if files > cfg.limits.max_files_changed:
+        report.failures.append(f"{files} files changed (limit {cfg.limits.max_files_changed})")
+    if lines > cfg.limits.max_diff_lines:
+        report.failures.append(f"{lines} diff lines (limit {cfg.limits.max_diff_lines})")
     return report
 
 

@@ -1,9 +1,7 @@
 """Layered config loading.
 
 Precedence, lowest to highest: built-in defaults, config/base.toml, profile,
-[scenario layers], [agent overrides], environment, CLI. The access policy
-section may only be set in base.toml, except deny_patterns, which every layer
-may extend but none may shrink.
+[scenario layers], [agent overrides], environment, CLI.
 """
 
 from __future__ import annotations
@@ -25,7 +23,6 @@ from factory.features.definitions import FEATURES_BY_NAME
 from factory.features.resolver import FeatureStates
 
 DEFAULT_PROFILE = "sim"
-BUILTIN_DENY_PATTERNS = ("proprietary",)
 ENV_PREFIX = "FACTORY__"
 
 
@@ -174,32 +171,10 @@ def agent_layer(agent_raw: Mapping, name: str, problems: list[str]) -> Layer:
     return Layer(f"agent:{name}", data)
 
 
-def _check_access_policy(layer: Layer, problems: list[str]) -> None:
-    section = layer.data.get("access_policy")
-    if section is None:
-        return
-    if not isinstance(section, Mapping):
-        problems.append(f"{layer.source}: access_policy must be a table")
-        return
-    for key in section:
-        if key != "deny_patterns":
-            problems.append(
-                f"{layer.source}: access_policy.{key} can only be set in the global config file (config/base.toml)"
-            )
-
-
-def _merge_layers(layers: Sequence[Layer], extra_deny: Sequence[str] = ()) -> dict:
+def _merge_layers(layers: Sequence[Layer]) -> dict:
     merged: dict = {}
-    deny: list[str] = list(BUILTIN_DENY_PATTERNS)
     for layer in layers:
         merged = deep_merge(merged, layer.data)
-        for pattern in layer.data.get("access_policy", {}).get("deny_patterns", []) or []:
-            if pattern not in deny:
-                deny.append(pattern)
-    for pattern in extra_deny:
-        if pattern not in deny:
-            deny.append(pattern)
-    merged.setdefault("access_policy", {})["deny_patterns"] = deny
     return merged
 
 
@@ -225,8 +200,6 @@ def load(
     cli_l = cli_layer(overrides, problems)
     lower = [base, prof, *extra_layers]
     upper = [env_l, cli_l]
-    for layer in (prof, *extra_layers, env_l, cli_l):
-        _check_access_policy(layer, problems)
 
     merged = _merge_layers([*lower, *upper])
     problems.extend(find_literal_secrets(merged))
@@ -251,7 +224,7 @@ def load(
             continue
         alayer = agent_layer(raw, agent.name, problems)
         layers = [*lower, alayer, *upper]
-        amerged = _merge_layers(layers, agent.extra_deny_patterns)
+        amerged = _merge_layers(layers)
         try:
             agent_configs[agent.name] = build(FactoryConfig, amerged, root="")
         except ConfigError as exc:

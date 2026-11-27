@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/*[Pp][Rr][Oo][Pp][Rr][Ii][Ee][Tt][Aa][Rr][Yy]*)",
+      "Read(**/*[Pp][Rr][Oo][Pp][Rr][Ii][Ee][Tt][Aa][Rr][Yy]*/**)",
+      "Edit(**/*[Pp][Rr][Oo][Pp][Rr][Ii][Ee][Tt][Aa][Rr][Yy]*)",
+      "Edit(**/*[Pp][Rr][Oo][Pp][Rr][Ii][Ee][Tt][Aa][Rr][Yy]*/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|MultiEdit|Write|NotebookRead|NotebookEdit|Grep|Glob|LS|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/restricted_files.py\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

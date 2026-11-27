@@ -46,16 +46,21 @@ These were tested only with fakes or emulators.
 - [ ] **Cline CLI flags** (`--yolo`, `--model`, prompt as an argument). Override with `harnesses.cline.settings.args` if they differ.
 - [ ] **Codex:** accepts `-c model_providers.*` overrides and reads the prompt from stdin with `-`.
 - [ ] **Claude Code:** honors `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` against the gateway, and `--dangerously-skip-permissions` is acceptable inside the sandbox.
+- [ ] **Claude Code and the agent kit:** with `-p --dangerously-skip-permissions`, the workspace's `.claude/settings.json` still runs the `PreToolUse` hook and enforces the `permissions.deny` rules, the character-class deny patterns match as expected, and the `restricted-files` skill loads.
+- [ ] **Cline hooks:** the hook file location (`.clinerules/hooks/PreToolUse`), its JSON input (`preToolUse.toolName`, `parameters`, `workspaceRoots`) and output (`cancel`, `errorMessage`) match the installed Cline. The hook was tested only against that assumed format.
+- [ ] **Codex:** whether the installed version supports pre-tool-use hooks or reads skills from a repo directory. Today Codex gets the rule through `AGENTS.md` only, and `factory config validate` warns about it.
 - [ ] **jam:** passes arguments through unchanged (`jam claude <args>`).
 - [ ] **Jira REST v2 and GitLab REST v4 response shapes,** against the real versions. Each adapter passes its contract suite on hand-written emulators only.
 - [ ] **The S3-compatible endpoint:** path-style addressing, SSE-KMS support, and `If-None-Match` on put.
 
 ## Known gaps
 
-- [ ] **Sandbox isolation.** `local_dir` doesn't isolate the network or the filesystem view, so external CLI agents could reach other hosts. Add a `bubblewrap` or rootless `podman` sandbox plugin: no network except the gateway socket, and the workspace as the only writable view. Then `deny_read` mode can also work with external harnesses.
+- [ ] **Sandbox isolation.** `local_dir` doesn't isolate the network or the filesystem view, so CLI agents could reach other hosts or read outside the workspace. Add a `bubblewrap` or rootless `podman` sandbox plugin: no network except the gateway socket, and the workspace as the only writable view.
+- [ ] **Restricted files are enforced by the agents only.** The factory no longer filters, strips or gates restricted files: the agent kit's skill and hooks do. The hook is best-effort for shell commands (it reads paths out of the command line), and an agent without hooks (Codex, or an unknown `harness.command`) relies on the skill alone. Factory-side model calls that are not agents (triage, spec, review, intake drafting) see ticket text, attachments, standards files and diffs as they are.
+- [ ] **Multi-repo tickets.** Each changed repo gets its own branch and MR with the same branch name; they are not linked to each other on the git host (only in each MR description and the Jira comment). MR comment fixes work per MR. Decide whether cross-repo changes should be merged together (for example, by a label or a merge train).
 - [ ] **Jira project roles.** These aren't resolved, so commenter rules that use `project_roles` won't match yet. Users and groups work.
 - [ ] **Reviewing human-authored MRs.** The reviewer only reviews the agent's own MRs. If wanted, add a reviewer agent for people's MRs; `/apply` already opens follow-up MRs instead of pushing to their branch.
-- [ ] **Per-tool-call auditing for external harnesses.** This needs harness hook support (for example Claude Code hooks calling `factory guard check`). Today the isolated workspace plus the diff-back gates are the enforcement.
+- [ ] **Hook decisions in traces.** The kit's hook blocks calls but does not report them to the factory, so blocked attempts are not in run traces or metrics. It could append to a log file under `.factory/` that the worker reads after the run.
 - [ ] **Mutation testing of the factory itself.** The factory enforces mutation gates on target repos, but its own codebase has no mutation run yet. Add one (for example `mutmut`) to the factory repo's CI.
 - [ ] **Partial trace flushing.** Traces are uploaded at the end of each run. Add a periodic flush (`trace_store.flush_interval_seconds`) for very long runs.
 - [ ] **Metrics export.** `factory metrics --format prometheus` prints text. Wire it to a node-exporter textfile or a push target if you use Prometheus.

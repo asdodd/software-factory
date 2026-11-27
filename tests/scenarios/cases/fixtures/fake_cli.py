@@ -2,7 +2,8 @@
 
 Each fake checks the invocation its preset should produce, asks the factory
 gateway for an edit (in the dialect the real tool speaks), applies it, checks
-it cannot see restricted material, and reports like the real tool."""
+its workspace carries the agent kit and that the kit's hook blocks restricted
+files, and reports like the real tool."""
 
 import json
 import os
@@ -24,12 +25,31 @@ def need(cond, what):
         problems.append(what)
 
 
+MARKER = "propri" + "etary"
+
+
+def hook_blocks(path):
+    payload = json.dumps({"tool_name": "Read", "tool_input": {"file_path": path}, "cwd": os.getcwd()})
+    proc = subprocess.run([sys.executable, ".claude/hooks/restricted_files.py"], input=payload, capture_output=True,
+                          text=True)
+    return proc.returncode == 2
+
+
+for kit in (".claude/settings.json", ".claude/hooks/restricted_files.py", ".claude/skills/restricted-files/SKILL.md",
+            ".clinerules/hooks/PreToolUse"):
+    need(os.path.isfile(kit), f"kit file {kit} missing")
+for note in ("AGENTS.md", "CLAUDE.md"):
+    with open(note) as fh:
+        need("agent-kit:restricted-files" in fh.read(), f"{note} lacks the kit rule")
 for root, dirs, files in os.walk("."):
-    dirs[:] = [d for d in dirs if d != ".git"]
+    dirs[:] = [d for d in dirs if d not in (".git", ".claude", ".clinerules")]
     for name in files:
-        need("proprietary" not in os.path.join(root, name).lower(), f"saw {os.path.join(root, name)}")
-need("TOPSECRET" not in subprocess.run(["git", "log", "-p", "--all"], capture_output=True, text=True).stdout,
-     "history leaks restricted content")
+        path = os.path.join(root, name)
+        if MARKER in path.lower():
+            need(hook_blocks(path), f"hook allowed {path}")
+need(not hook_blocks("src/calc.py"), "hook blocked an ordinary file")
+need(subprocess.run(["git", "rev-list", "--all", "--count"], capture_output=True, text=True).stdout.strip() == "1",
+     "history beyond the baseline commit")
 for var in os.environ:
     need(not var.startswith(("AWS_", "SIM_")) and not var.lower().endswith("_proxy"), f"env leaks {var}")
 

@@ -3,3 +3,6 @@ __pycache__/
 var/
 *.egg-info/
 *.whl
+repos/
+tickets/
+workspace.toml

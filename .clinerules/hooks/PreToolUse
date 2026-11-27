@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Cline pre-tool-use hook for the restricted-files skill. Same checks as the Claude Code hook.
+kit=$(cd "$(dirname "$0")/../.." && pwd)
+exec python3 "$kit/.claude/hooks/restricted_files.py" --format cline

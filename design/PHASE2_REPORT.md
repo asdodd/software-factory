@@ -24,7 +24,7 @@ factory config validate --profile prod       # now also lists respond.model and 
   - any service or bot principal.
 
   Anyone else's comments are ignored, logged by author id only, and counted (metric `comments_ignored`). An empty rule ignores everyone.
-- Comment bodies are data. Nothing in the factory reads limits, filters, config, permissions or protected paths from them. A scenario sends a reply that says to raise `max_attempts`, disable the access policy and edit `.gitlab-ci.yml`; the gates still reject the change.
+- Comment bodies are data. Nothing in the factory reads limits, filters, config, permissions or protected paths from them. A scenario sends a reply that says to raise `max_attempts`, disable review and edit `.gitlab-ci.yml`; the gates still reject the change.
 
 **MR comment loop** (`poll_mrs`):
 - Each MR the agent opened is watched. The agent polls new comments with a cursor at `mr.poll_interval_seconds`. It stops watching when the MR is merged or closed, or after `inactivity_timeout_days`, and says so on the ticket.

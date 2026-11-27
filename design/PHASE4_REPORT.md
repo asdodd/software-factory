@@ -54,7 +54,7 @@ Each of the following is behind its own feature toggle, in the spec's order.
 - It reads the metrics, the calibrated grades, the worst runs and the editable files from the factory repo (`feedback.self_improvement.repo`), then asks the `improve` stage for proposals.
 - Edits outside `allowed_paths` (default: `factory/skills/**` and `config/agents/**`), touching restricted paths, or carrying restricted content are dropped and listed in the MR.
 - The result is opened as an MR on `ai/self-improvement/<date>` with the required template sections plus a **Retro** section of suggested automated checks and coding-standard updates.
-- It never applies anything. In a scenario it proposes `access_policy.enabled = false` in `config/base.toml`; that edit is dropped and `main` is untouched.
+- It never applies anything. In a scenario it proposes raising `limits.max_attempts` in `config/base.toml`; that edit is dropped and `main` is untouched.
 
 ## Test results
 

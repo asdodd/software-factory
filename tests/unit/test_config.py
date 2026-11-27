@@ -49,12 +49,12 @@ def test_literal_secret_in_config_rejected():
         load(ROOT, env={}, extra_layers=[layer])
 
 
-def test_deny_patterns_extend_but_never_shrink():
-    layer = Layer("scenario", {"access_policy": {"deny_patterns": ["export-controlled"]}})
+def test_harness_without_hooks_is_flagged():
+    layer = Layer("scenario", {"models": {"stages": {"implement": {"harness": "codex"}}}})
     loaded = load(ROOT, env={}, extra_layers=[layer])
-    assert loaded.config.access_policy.deny_patterns == ["proprietary", "export-controlled"]
-    empty = load(ROOT, env={}, extra_layers=[Layer("scenario", {"access_policy": {"deny_patterns": []}})])
-    assert "proprietary" in empty.config.access_policy.deny_patterns
+    assert any("harness 'codex' has no pre-tool-use hook" in d.message for d in loaded.diagnostics)
+    claude = load(ROOT, env={}, extra_layers=[Layer("scenario", {"models": {"stages": {"implement": {"harness": "claude"}}}})])
+    assert not any("pre-tool-use hook" in d.message for d in claude.diagnostics)
 
 
 def test_disabled_ports_are_never_built(tmp_path):

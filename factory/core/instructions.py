@@ -19,15 +19,25 @@ def base_skills() -> str:
     return "\n\n".join(p.read_text().strip() for p in sorted((SKILLS / "base").glob("*.md")))
 
 
-def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequence[tuple[str, str]],
+def _commands(rules: RepoRules) -> list[str]:
+    commands = rules.commands
+    listed = [("lint", commands.lint), ("test", commands.test), ("verify", commands.verify)]
+    return [f"- {name}: {' '.join(cmd)}" for name, cmds in listed for cmd in cmds]
+
+
+def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequence[str],
            spec: str = "", feedback: Sequence[str] = (), withheld_attachments: int = 0,
-           attachments_dir: str = "", answers: Sequence[str] = ()) -> str:
+           attachments_dir: str = "", answers: Sequence[str] = (),
+           repos: Sequence[tuple[str, str, RepoRules]] = ()) -> str:
+    """standards: paths of standards files in the working directory (the agent
+    reads them itself). repos: (path, directory, rules) when the ticket spans
+    several repos; empty for one repo, whose copy is the working directory."""
     parts = [
         "# Factory task",
         base_skills(),
         "## Limits",
         f"- At most {cfg.limits.max_files_changed} files changed and {cfg.limits.max_diff_lines} diff lines.",
-        "- The change is checked by mechanical gates: lint, tests, protected paths, access policy, and size.",
+        "- The change is checked by mechanical gates: lint, tests, protected paths, and size.",
         f"## Ticket {ticket.key}: {ticket.summary}",
         ticket.description.strip() or "(no description)",
         "### Acceptance criteria",
@@ -40,17 +50,25 @@ def render(ticket: Ticket, cfg: FactoryConfig, rules: RepoRules, standards: Sequ
         parts += ["## Approved spec", spec]
     if answers:
         parts += ["## Answers from the ticket", *answers]
-    commands = rules.commands
-    listed = [("lint", commands.lint), ("test", commands.test), ("verify", commands.verify)]
-    lines = [f"- {name}: {' '.join(cmd)}" for name, cmds in listed for cmd in cmds]
-    if lines:
-        parts += ["## Repo commands", *lines]
-    for name, text in standards:
-        parts += [f"## Repo standards: {name}", text.strip()]
+    if repos:
+        parts += ["## Repos",
+                  "This ticket spans several repos. Each is a directory in your working directory; "
+                  "change only the ones the ticket needs. Each repo's commands run inside its own directory.",
+                  *(f"- {path}: ./{directory}/" for path, directory, _ in repos)]
+        for path, directory, repo_rules in repos:
+            lines = _commands(repo_rules)
+            if lines:
+                parts += [f"## Repo commands: {path} (run in ./{directory}/)", *lines]
+    else:
+        lines = _commands(rules)
+        if lines:
+            parts += ["## Repo commands", *lines]
+    if standards:
+        parts += ["## Repo standards", "Read and follow these files:", *(f"- {s}" for s in standards)]
     if attachments_dir:
         parts += ["## Attachments", f"Readable attachments are in {attachments_dir}."]
     if withheld_attachments:
-        parts.append(f"{withheld_attachments} attachment(s) were withheld by the access policy.")
+        parts.append(f"{withheld_attachments} attachment(s) were withheld.")
     if feedback:
         parts += ["## Previous attempt failed", *(f"- {f}" for f in feedback)]
     parts += ["## When finished",

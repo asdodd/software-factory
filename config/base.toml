@@ -29,7 +29,6 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "model_provider.scripted" = "factory.adapters.fake.model_provider:ScriptedModelProvider"
 "model_provider.replay"  = "factory.adapters.models.replay:ReplayModelProvider"
 "model_provider.openai_compatible" = "factory.adapters.models.openai_compatible:OpenAICompatibleProvider"
-"harness.builtin"        = "factory.core.harness.builtin:BuiltinHarness"
 "harness.command"        = "factory.core.harness.command:CommandHarness"
 "harness.cli_agent"      = "factory.core.harness.cli_agents:CliAgentHarness"
 "harness.scripted"       = "factory.adapters.fake.harness:ScriptedHarness"
@@ -37,7 +36,6 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "trace_store.memory"     = "factory.adapters.trace.stores:MemoryTraceStore"
 "trace_store.local_fs"   = "factory.adapters.trace.stores:LocalFsTraceStore"
 "trace_store.s3"         = "factory.adapters.trace.s3:S3TraceStore"
-"access_guard.policy"    = "factory.access.guard:PolicyAccessGuard"
 "notifier.fake"          = "factory.adapters.fake.notifier:FakeNotifier"
 "notifier.ticket_comment" = "factory.core.notify:TicketCommentNotifier"
 "monitor.fake"           = "factory.adapters.fake.monitor:FakeMonitor"
@@ -50,9 +48,6 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "clock.fake"             = "factory.adapters.fake.clock:FakeClock"
 "id_source.uuid"         = "factory.core.clock:UuidIdSource"
 "id_source.sequential"   = "factory.adapters.fake.clock:SequentialIdSource"
-
-[plugins.access_guard]
-adapter = "access_guard.policy"   # the only guard; not swappable per profile in practice
 
 # Jira status and workflow mapping. Keys on the left are the factory's logical
 # states (fixed); values on the right are your Jira's names (config).
@@ -119,7 +114,6 @@ max_attempts = 2
 max_tokens_per_ticket = 2000000
 max_files_changed = 15                   # readiness "bounded scope" and PR gate
 max_diff_lines = 600
-max_denied_access_attempts = 5           # run stops and comments after this many
 
 [git]
 executable = "git"
@@ -146,16 +140,10 @@ flush_interval_seconds = 60
 [trace_store.redaction]
 extra_patterns = []                      # regexes, added to built-in secret scrubbers
 
-# Base skill: no proprietary files. `enabled` is honoured ONLY from this file;
-# profiles, agents, repo rules, env, and CLI cannot change it. Agents and repos
-# may add deny patterns, never remove these.
-[access_policy]
-enabled = true
-deny_patterns = ["proprietary"]
-match_on = ["path", "content"]
-case_insensitive = true
-content_scan_bytes = 8192
-mode = "strip"                           # strip | deny_read
+# Restricted files are handled by the agents themselves: every workspace gets
+# the agent kit (factory/agent_kit: the restricted-files skill, AGENTS.md and
+# CLAUDE.md, and pre-tool-use hooks for Claude Code and Cline). The factory
+# stops a run whose agent changed the kit. There is no factory-side filter.
 
 [intake]
 dedupe_window_days = 90
@@ -196,7 +184,7 @@ model = ""
 [models.stages.implement]
 provider = ""
 model = ""
-harness = "builtin"
+harness = "claude"
 [models.stages.review]
 provider = ""
 model = ""
@@ -219,16 +207,13 @@ agent_tokens_per_day = 0
 requests_per_minute = 0
 
 # Harnesses. Every harness gets the same thing: an isolated workspace copy
-# (access policy applied, history replaced by one baseline commit), a rendered
-# instructions file (ticket, spec, base skills, global and repo rules), and a
-# loopback model gateway URL with a per-run token. It never gets upstream model
-# credentials, ticket or git-host credentials, or the real clone. The factory
-# diffs the result, runs the PR gates, and pushes.
-[harnesses.builtin]
-adapter = "harness.builtin"               # in-house tool loop; tools go through AccessGuard
-timeout_minutes = 60
-max_turns = 200
-
+# (history replaced by one baseline commit, one directory per repo when a ticket
+# names several, the agent kit installed), a rendered instructions file (ticket,
+# spec, base skills, global and repo rules), and a loopback model gateway URL
+# with a per-run token. It never gets upstream model credentials, ticket or
+# git-host credentials, or the real clone. The factory diffs the result, runs
+# the PR gates, and pushes.
+#
 # Known CLI agents: Claude Code, Codex, and Cline, run directly or through jam
 # (`jam claude ...`, `jam codex ...`). Each is pointed at the loopback gateway
 # with a per-run token. Pick one per stage and per agent, e.g.
@@ -237,6 +222,8 @@ max_turns = 200
 # args (replace preset arguments), extra_args, env. See factory/core/harness/cli_agents.py.
 [harnesses.claude]
 adapter = "harness.cli_agent"
+timeout_minutes = 60
+max_turns = 200
 settings = { agent = "claude" }
 
 [harnesses.codex]

@@ -1,0 +1,22 @@
+name = "an agent that changes its restricted-files kit is stopped, and nothing is pushed"
+include = ["_common.toml", "_ticket.toml"]
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = ".claude/settings.json", content = "{}" },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["blocked"]
+[[expect.tickets]]
+key = "SIM-1"
+comments_contain = ["changed its restricted-files kit", ".claude/settings.json"]
+[expect.git]
+mrs = 0
+no_pushes = true

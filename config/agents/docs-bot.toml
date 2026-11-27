@@ -3,7 +3,6 @@ enabled = true
 service_account = "svc-factory-docs"
 team = "docs"
 repos = ["docs/handbook"]
-extra_deny_patterns = ["export-controlled"]
 
 [filter]
 labels_any = ["ai-ready-docs"]

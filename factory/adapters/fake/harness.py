@@ -1,7 +1,6 @@
-"""A bring-your-own harness stand-in. It acts on the workspace directly, as an
-external CLI agent would, without the factory's guarded tools. Scenarios use
-it to prove the isolation and diff-back gates hold for harnesses the factory
-did not write."""
+"""A harness stand-in. It acts on the workspace directly, as an external CLI
+agent would. Scenarios use it to prove the isolation, the agent kit, and the
+diff-back gates hold for harnesses the factory did not write."""
 
 from __future__ import annotations
 
@@ -21,6 +20,7 @@ class ScriptedHarness:
         self.scripts: dict[str, list[list[Mapping[str, object]]]] = {}
         self.tasks: list[HarnessTask] = []
         self.observations: list[dict[str, object]] = []
+        self.hook_results: list[dict[str, object]] = []
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, object], ctx: AdapterContext) -> ScriptedHarness:
@@ -42,9 +42,19 @@ class ScriptedHarness:
                 target.write_text(str(action.get("content", "")))
             elif "delete" in action:
                 (root / str(action["delete"])).unlink(missing_ok=True)
+            elif "hook" in action:
+                # Run the workspace's own restricted-files hook, as Claude Code would before a tool call.
+                spec = dict(action["hook"])
+                payload = {"tool_name": spec.get("tool", "Read"), "tool_input": dict(spec.get("input", {})),
+                           "cwd": str(root)}
+                proc = subprocess.run(["python3", str(root / ".claude/hooks/restricted_files.py")],
+                                      input=json.dumps(payload), capture_output=True, text=True, cwd=root,
+                                      env={"PATH": os.environ.get("PATH", "")})
+                self.hook_results.append({"input": payload["tool_input"], "blocked": proc.returncode == 2,
+                                          "message": proc.stderr})
             elif "observe" in action:
                 files = sorted(str(p.relative_to(root)) for p in root.rglob("*")
-                               if p.is_file() and ".git" not in p.relative_to(root).parts)
+                               if (p.is_file() or p.is_symlink()) and ".git" not in p.relative_to(root).parts)
                 history = subprocess.run(["git", "log", "-p", "--all"], cwd=root, capture_output=True, text=True,
                                          env={"PATH": os.environ.get("PATH", "")}).stdout
                 instructions = Path(task.instructions_file).read_text()

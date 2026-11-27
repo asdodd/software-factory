@@ -3,7 +3,9 @@ and Cline, launched directly or through the `jam` launcher (`jam claude ...`).
 
 Every preset is pointed at the factory's loopback gateway with a per-run token,
 so the agent never holds upstream model credentials. The agent works in the
-isolated workspace; the factory diffs and gates the result as for any harness.
+isolated workspace, which carries the agent kit: the restricted-files skill,
+AGENTS.md/CLAUDE.md, and pre-tool-use hooks for Claude Code and Cline. The
+factory diffs and gates the result as for any harness.
 
 Settings ([harnesses.<name>.settings]):
   agent        claude | codex | cline (required)
@@ -32,6 +34,7 @@ from factory.ports.types import Command, HarnessResult, HarnessStatus, HarnessTa
 PLACEHOLDERS = ("workspace", "instructions_file", "result_file", "gateway_url", "gateway_token", "model",
                 "max_turns", "prompt_file", "output_file", "prompt")
 MAX_ARG_PROMPT = 100_000
+HOOKED_AGENTS = frozenset({"claude", "cline"})
 
 FOOTER = (
     "\n\n## Reporting\nWork only inside the current directory. Do not commit, push, or contact any service. "
@@ -67,7 +70,8 @@ PRESETS: dict[str, Preset] = {
         dialect="anthropic_messages",
         prompt_via="stdin",
         output="claude_json",
-        notes="Permission prompts are skipped because the agent runs in the factory sandbox on an isolated copy.",
+        notes="Permission prompts are skipped because the agent runs in the factory sandbox on an isolated copy. "
+              "Hooks and permission deny rules from the workspace's .claude/settings.json still apply.",
     ),
     "codex": Preset(
         executable="codex",
@@ -128,6 +132,11 @@ class CliAgentHarness:
         return problems
 
     @staticmethod
+    def native_hooks(settings: Mapping[str, object]) -> bool:
+        """Whether the agent runs the kit's pre-tool-use hook (Claude Code and Cline do)."""
+        return str(settings.get("agent")) in HOOKED_AGENTS
+
+    @staticmethod
     def required_dialect(settings: Mapping[str, object]) -> str | None:
         preset = PRESETS.get(str(settings.get("agent")))
         return preset.dialect if preset else None
@@ -179,13 +188,11 @@ class CliAgentHarness:
             return HarnessResult(HarnessStatus.FAILED, f"{launcher} is not installed in the sandbox")
         final = self._final_message(result.stdout, output_file)
         parsed = _status_line(final)
-        guard = runtime.guard
         if parsed is not None:
             status, summary, questions = parsed
-            return HarnessResult(status, guard.filter_output(summary).text,
-                                 tuple(guard.filter_output(q).text for q in questions))
+            return HarnessResult(status, summary, questions)
         status = HarnessStatus.DONE if result.exit_code == 0 else HarnessStatus.FAILED
-        return HarnessResult(status, guard.filter_output(final[-2000:] or result.stderr[-2000:]).text)
+        return HarnessResult(status, final[-2000:] or result.stderr[-2000:])
 
     def _final_message(self, stdout: str, output_file: Path) -> str:
         if self.preset.output == "claude_json":

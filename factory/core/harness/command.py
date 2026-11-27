@@ -5,6 +5,8 @@ Settings:
         {result_file} {gateway_url} {gateway_token} {model} {max_turns}
   env: table of variables (same placeholders), e.g. the CLI's base-URL and key variables
   stdin_file: optional placeholder string; that file is fed to stdin
+  runs_kit_hooks: true if the agent runs the workspace's .claude or .clinerules
+        hooks (silences the config warning)
 The CLI may write {result_file} as JSON {"status", "summary", "questions"}.
 Otherwise exit code 0 means done and the tail of stdout is the summary."""
 
@@ -29,6 +31,11 @@ class CommandHarness:
         self.env = dict(env)
         self.stdin_file = stdin_file
 
+    @staticmethod
+    def native_hooks(settings: Mapping[str, object]) -> bool:
+        """Unknown agents: the factory cannot tell whether they run the kit's hooks."""
+        return bool(settings.get("runs_kit_hooks", False))
+
     @classmethod
     def from_settings(cls, settings: Mapping[str, object], ctx: AdapterContext) -> CommandHarness:
         return cls([str(a) for a in settings.get("argv", [])],
@@ -50,17 +57,16 @@ class CommandHarness:
         command = Command(tuple(fill(a) for a in self.argv), ".", {k: fill(v) for k, v in self.env.items()},
                           task.timeout_seconds, fill(self.stdin_file) if self.stdin_file else "")
         result = runtime.run(command)
-        guard = runtime.guard
         result_file = Path(task.result_file)
         if result_file.is_file():
             try:
                 doc = json.loads(result_file.read_text())
                 return HarnessResult(HarnessStatus(doc.get("status", "done")),
-                                     guard.filter_output(str(doc.get("summary", ""))).text,
-                                     tuple(guard.filter_output(str(q)).text for q in doc.get("questions", ())))
+                                     str(doc.get("summary", "")),
+                                     tuple(str(q) for q in doc.get("questions", ())))
             except (json.JSONDecodeError, ValueError):
                 return HarnessResult(HarnessStatus.FAILED, "harness wrote an unreadable result file")
         if result.timed_out:
             return HarnessResult(HarnessStatus.TIMED_OUT, f"harness timed out after {task.timeout_seconds:.0f}s")
-        summary = guard.filter_output(result.stdout[-2000:]).text
+        summary = result.stdout[-2000:]
         return HarnessResult(HarnessStatus.DONE if result.exit_code == 0 else HarnessStatus.FAILED, summary)

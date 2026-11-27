@@ -6,4 +6,4 @@ path = "platform/software-factory"
 [repos.files]
 "factory/skills/base/shared_process.md" = "# Base skill: shared process\n- Keep diffs small.\n"
 "config/agents/frontend-bot.toml" = "name = \"frontend-bot\"\n"
-"config/base.toml" = "[access_policy]\nenabled = true\n"
+"config/base.toml" = "[limits]\nmax_attempts = 2\n"

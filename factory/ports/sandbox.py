@@ -8,8 +8,7 @@ from factory.ports.types import Artifact, Command, CommandResult, Workspace, Wor
 
 @runtime_checkable
 class Sandbox(Protocol):
-    """Isolated execution. The agent never calls this directly: its tools go
-    through the AccessGuard first."""
+    """Isolated execution for harnesses and repo commands."""
 
     def prepare(self, spec: WorkspaceSpec) -> Workspace: ...
 

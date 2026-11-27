@@ -38,17 +38,16 @@ interface Mailbox {
 interface ModelProvider {
   complete(request) : ModelResponse
 }
-interface AgentHarness <<bring your own>> {
+interface AgentHarness <<any CLI agent>> {
   run(task: HarnessTask, runtime: HarnessRuntime) : HarnessResult
 }
 note right of AgentHarness
-  task: isolated workspace, instructions file,
-  result file, gateway endpoint + per-run token,
-  timeout, max_turns. No upstream credentials.
+  task: isolated workspace (one directory per repo
+  when several, agent kit installed), instructions
+  file, result file, gateway endpoint + per-run
+  token, timeout, max_turns. No upstream credentials.
 end note
 interface HarnessRuntime {
-  guard : AccessGuard
-  max_denials : int
   run(command) : CommandResult
 }
 AgentHarness ..> HarnessRuntime
@@ -57,14 +56,6 @@ interface Sandbox {
   run(workspace, command) : CommandResult
   collect_artifacts(workspace, patterns)
   teardown(workspace)
-}
-interface AccessGuard {
-  check_path(root, path) : AccessDecision
-  check_command(root, argv) : AccessDecision
-  check_attachment(name, content) : AccessDecision
-  scan_workspace(root) : ScanReport
-  filter_output(text) : FilteredOutput
-  check_diff_paths(paths) : AccessDecision
 }
 interface Notifier {
   notify(notification)

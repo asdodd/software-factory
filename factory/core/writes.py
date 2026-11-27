@@ -142,7 +142,7 @@ class Writes:
         allowed = MINIMAL if jc.verbosity == "minimal" else MILESTONES
         if jc.verbosity != "verbose" and milestone not in allowed:
             return None
-        body = self.redactor.redact(note.render(jc.verbosity == "verbose"), policy=False).text
+        body = self.redactor.redact(note.render(jc.verbosity == "verbose")).text
         if self.dry_run:
             self._intend("comment", {"ticket": key, "milestone": milestone, "body": body})
             return None
@@ -160,20 +160,20 @@ class Writes:
     # ---- intake replies --------------------------------------------------------
     def mail_reply(self, mailbox, reply) -> None:
         reply = type(reply)(reply.thread_id, reply.in_reply_to, reply.to, reply.cc, reply.subject,
-                            self.redactor.redact(reply.body, policy=False).text, reply.idempotency_key)
+                            self.redactor.redact(reply.body).text, reply.idempotency_key)
         if self.dry_run:
             return self._intend("mail_reply", {"to": list(reply.to), "cc": list(reply.cc), "subject": reply.subject})
         mailbox.send_reply(reply)
 
     def host_comment(self, event, body: str, idempotency_key: str) -> None:
-        body = self.redactor.redact(body, policy=False).text
+        body = self.redactor.redact(body).text
         if self.dry_run:
             return self._intend("host_comment", {"url": event.url, "body": body})
         self.git.comment_on(event, body, idempotency_key)
 
     # ---- merge request comments ----------------------------------------------
     def mr_reply(self, repo, mr_id: str, thread_id: str, body: str, idempotency_key: str) -> None:
-        body = self.redactor.redact(body, policy=False).text
+        body = self.redactor.redact(body).text
         if self.dry_run:
             return self._intend("mr_reply", {"mr": mr_id, "thread": thread_id, "body": body})
         self.git.reply_in_thread(repo, mr_id, thread_id, body, idempotency_key)

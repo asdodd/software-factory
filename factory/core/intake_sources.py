@@ -66,7 +66,6 @@ class IntakeRunner:
         self.writes = Writes(self.tickets, self.git, self.state, self.clock, container.redactor, self.cfg, "intake",
                              self.features.on("dry_run"))
         self.service = IntakeService(loaded, self.tickets, self.state, self.clock, self.writes)
-        self.guard = container.port("access_guard").derive(self.cfg.access_policy.deny_patterns)
         self.threads = Records(self.state, "email-threads")
         self.service_accounts = {a.service_account for a in loaded.agents.values()}
         self.known_repos = sorted({r for a in loaded.agents.values() for r in a.repos})
@@ -165,7 +164,7 @@ class IntakeRunner:
         if not self.cfg.intake.email.allow_updates:
             self._ignore(msg, "reply on a thread that already has a ticket (allow_updates is false)")
             return None
-        body = self.guard.filter_output(msg.body).text[:4000]
+        body = msg.body[:4000]
         self.writes.comment(ticket_key, "email_update", Note(
             "Email update", "unchanged", done=f"From {_addr(msg.sender)} (untrusted email content):\n{body}"),
             f"email:{msg.message_id}")
@@ -178,8 +177,7 @@ class IntakeRunner:
         for m in messages:
             parts.append(f"From: {_addr(m.sender)}\nSubject: {m.subject}\n\n{m.body}")
             for att in m.attachments:
-                if len(att.content) > cfg.max_attachment_bytes or not self.guard.check_attachment(
-                        att.filename, att.content).allowed:
+                if len(att.content) > cfg.max_attachment_bytes:
                     withheld += 1
                     continue
                 if att.media_type.startswith(TEXT_TYPES):
@@ -187,8 +185,8 @@ class IntakeRunner:
                 else:
                     parts.append(f"Attachment {att.filename} ({att.media_type}, not text)")
         if withheld:
-            parts.append(f"{withheld} attachment(s) were withheld by policy.")
-        text = self.guard.filter_output("\n\n---\n\n".join(parts)).text
+            parts.append(f"{withheld} attachment(s) were withheld: over the size limit.")
+        text = "\n\n---\n\n".join(parts)
         stage = self.cfg.models.stages.intake
         models = BudgetedModels(self.c.provider, self.c.port("accounting"), self.clock,
                                 self.cfg.limits.max_tokens_per_ticket)
@@ -299,7 +297,7 @@ class IntakeRunner:
             if level < floor:
                 self.metrics.incr("monitor_findings_below_threshold", source=f.source)
                 continue
-            details = self.guard.filter_output(f.details).text
+            details = f.details
             result = self.service.submit(IntakeEvent(
                 source=f"monitor:{f.source}", event_id=f.event_id, project=cfg.default_project,
                 summary=f.summary[:250], description=f"{details}\n\nSeverity: {f.severity}. Location: {f.location}. "

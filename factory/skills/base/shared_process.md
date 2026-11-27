@@ -1,5 +1,10 @@
 # Base skill: shared process (mandatory)
 
+- Follow the `restricted-files` skill installed in your workspace
+  (`.claude/skills/restricted-files/SKILL.md`, summarized in `AGENTS.md`). It is
+  mandatory, and a pre-tool-use hook backs it up where your agent supports hooks.
+- Do not edit `.claude/`, `.clinerules/`, or the restricted-files section of
+  `AGENTS.md` or `CLAUDE.md`. A run that changes them is stopped.
 - Work only inside your workspace and only on the ticket you were given.
 - Change only what the ticket asks. Keep diffs small and within the limits stated below.
 - Do not create markdown or documentation files unless the ticket asks for them.

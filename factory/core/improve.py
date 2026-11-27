@@ -57,7 +57,6 @@ class SelfImprovement:
         self.clock = container.port("clock")
         self.git = container.port("git_host")
         self.sandbox = container.port("sandbox")
-        self.guard = container.port("access_guard").derive(self.cfg.access_policy.deny_patterns)
         self.writes = Writes(container.port("ticket_system"), self.git, container.port("state_store"), self.clock,
                              container.redactor, self.cfg, AGENT, container.loaded.features.on("dry_run"))
 
@@ -82,7 +81,6 @@ class SelfImprovement:
         try:
             clone = ws.root / "clone"
             self.git.clone(repo, clone, self.si.base_branch)
-            self.guard.scan_workspace(clone)
             files = self._allowed_files(clone)
             proposal = self._ask(report, grades, files)
             return self._open(repo, clone, proposal, report, grades)
@@ -93,8 +91,7 @@ class SelfImprovement:
         out = {}
         for p in sorted(clone.rglob("*")):
             rel = str(p.relative_to(clone))
-            if p.is_file() and ".git" not in p.parts and glob_match(rel, self.si.allowed_paths) and \
-                    self.guard.check_path(clone, rel).allowed:
+            if p.is_file() and ".git" not in p.parts and glob_match(rel, self.si.allowed_paths):
                 out[rel] = p.read_text(errors="replace")[:20000]
         return out
 
@@ -119,9 +116,7 @@ class SelfImprovement:
         edits, dropped = [], []
         for e in proposal.get("edits") or []:
             path = str(e.get("path", "")) if isinstance(e, dict) else ""
-            if (not path or not glob_match(path, self.si.allowed_paths) or ".." in Path(path).parts
-                    or not self.guard.check_diff_paths([path]).allowed
-                    or self.guard.content_matches(str(e.get("content", "")).encode())):
+            if not path or not glob_match(path, self.si.allowed_paths) or ".." in Path(path).parts:
                 dropped.append(path or "(unnamed)")
                 continue
             edits.append((path, str(e.get("content", ""))))

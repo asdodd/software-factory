@@ -1,5 +1,0 @@
-name = "the access policy cannot be weakened by a profile or scenario layer, only extended"
-[settings.access_policy]
-mode = "deny_read"
-[expect]
-startup_error = "access_policy.mode can only be set in the global config file"

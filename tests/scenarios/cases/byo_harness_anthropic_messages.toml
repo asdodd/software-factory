@@ -1,4 +1,4 @@
-name = "a bring-your-own CLI harness (anthropic_messages) works through the gateway and sees nothing restricted"
+name = "a bring-your-own CLI harness (anthropic_messages) works through the gateway in a workspace carrying the agent kit"
 include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
 agent_files = ["agents/secure-bot.toml"]
 process_env = { SIM_SECRET = "should-not-leak", FACTORY_JIRA_TOKEN = "nope-nope-nope", AWS_SECRET_ACCESS_KEY = "nope-nope-nope" }
