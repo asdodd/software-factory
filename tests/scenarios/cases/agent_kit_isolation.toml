@@ -1,0 +1,47 @@
+name = "every harness workspace carries the agent kit, keeps restricted files on disk, and its hook blocks them"
+include = ["_common.toml", "_secure_repo.toml", "_secure_ticket.toml"]
+agent_files = ["agents/secure-bot.toml"]
+
+[[attachments]]
+ticket = "SIM-1"
+name = "spec.txt"
+content = "multiply should accept ints"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { hook = { tool = "Read", input = { file_path = "proprietary/algo.py" } } },
+  { hook = { tool = "Read", input = { file_path = "src/vendor_algo.py" } } },
+  { hook = { tool = "Read", input = { file_path = "src/link.py" } } },
+  { hook = { tool = "Read", input = { file_path = "vendor/keys/proprietary/keys.txt" } } },
+  { hook = { tool = "Grep", input = { pattern = "TOPSECRET", path = "src" } } },
+  { hook = { tool = "Bash", input = { command = "cat docs/*.md" } } },
+  { hook = { tool = "Bash", input = { command = "git show HEAD:src/vendor_algo.py" } } },
+  { hook = { tool = "Read", input = { file_path = "src/calc.py" } } },
+  { hook = { tool = "Grep", input = { pattern = "def add", path = "vendor/keys/util.py" } } },
+  { hook = { tool = "Bash", input = { command = "python3 -m unittest discover -s tests" } } },
+  { write = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "secure-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+files_include = ["src/calc.py", "vendor/keys/util.py", "proprietary/algo.py", "src/vendor_algo.py",
+                 ".claude/settings.json", ".claude/hooks/restricted_files.py",
+                 ".claude/skills/restricted-files/SKILL.md", ".clinerules/hooks/PreToolUse", "AGENTS.md", "CLAUDE.md"]
+instructions_contain = ["restricted-files", "Readable attachments are in"]
+hook_blocked = ["proprietary/algo.py", "src/vendor_algo.py", "src/link.py", "keys.txt", "TOPSECRET", "docs/*.md",
+                "HEAD:src/vendor_algo.py"]
+hook_allowed = ["src/calc.py", "vendor/keys/util.py", "unittest"]
+[expect.git]
+mrs = 1
+[[expect.git.branch_files]]
+path = "web/secure"
+branch = "ai/secure-bot/SIM-1"
+contains = { "proprietary/algo.py" = "TOPSECRET-ALGO", "src/calc.py" = "def multiply" }
+absent = [".claude/settings.json", ".claude/hooks/restricted_files.py", "AGENTS.md", "CLAUDE.md", ".clinerules/hooks/PreToolUse"]

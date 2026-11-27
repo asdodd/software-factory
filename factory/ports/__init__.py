@@ -1,6 +1,5 @@
 """Ports: the only interfaces core depends on. Core never imports adapters."""
 
-from factory.ports.access_guard import AccessGuard
 from factory.ports.accounting import Accounting
 from factory.ports.clock import Clock, IdSource
 from factory.ports.git_host import GitHost
@@ -21,7 +20,6 @@ PORTS: dict[str, type] = {
     "model_provider": ModelProvider,
     "agent_harness": AgentHarness,
     "sandbox": Sandbox,
-    "access_guard": AccessGuard,
     "notifier": Notifier,
     "monitor": Monitor,
     "trace_store": TraceStore,
@@ -34,7 +32,6 @@ PORTS: dict[str, type] = {
 __all__ = [
     "PORTS",
     "AgentHarness",
-    "AccessGuard",
     "Accounting",
     "Clock",
     "GitHost",

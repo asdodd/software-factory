@@ -37,9 +37,5 @@ class SubmoduleFailure(PortError):
         self.path = path
 
 
-class AccessDenied(PortError):
-    """Raised by tools when the AccessGuard denies a read. Carries paths only."""
-
-
 class BudgetExceeded(PortError):
     pass

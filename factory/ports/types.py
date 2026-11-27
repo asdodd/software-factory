@@ -378,27 +378,6 @@ class Artifact:
     media_type: str
 
 
-@dataclass(frozen=True)
-class AccessDecision:
-    allowed: bool
-    reason: str = ""
-    matched_pattern: str | None = None
-
-
-@dataclass(frozen=True)
-class ScanReport:
-    """Paths only. Never content."""
-
-    matched_paths: tuple[str, ...]
-    action: str
-
-
-@dataclass(frozen=True)
-class FilteredOutput:
-    text: str
-    redactions: int
-
-
 class NotificationKind(enum.Enum):
     SPEC_REVIEW = "spec_review"
     MR_READY = "mr_ready"
@@ -541,10 +520,11 @@ class HarnessStatus(enum.Enum):
 class HarnessTask:
     """One stage of work handed to a harness.
 
-    workspace is an isolated copy: the access policy is already applied and git
-    history is replaced by a single baseline commit, so no harness can read
-    restricted files from the tree or from history. The factory, not the
-    harness, diffs the result and carries it to the real branch.
+    workspace is an isolated copy with git history replaced by a single
+    baseline commit, and with the agent kit installed (the restricted-files
+    skill and the hooks that back it). With several repos, workspace.root
+    holds one directory per repo. The factory, not the harness, diffs the
+    result and carries it to the real branches.
     instructions_file holds the rendered prompt: ticket, approved spec, base
     skills, global rules, and repo rules. result_file is where the harness may
     write a HarnessResult as JSON.

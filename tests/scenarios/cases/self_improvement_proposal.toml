@@ -7,7 +7,7 @@ content = { verbosity = 2, wasted_tool_calls = 1, excess_tests = 0, notes = "one
 repeat = true
 [[model]]
 stage = "improve"
-content = { summary = "Tell agents to read each file once.", rationale = "Graded runs waste reads.", edits = [{ path = "factory/skills/base/shared_process.md", content = "# Base skill: shared process\n- Keep diffs small.\n- Read each file once; reuse what you read.\n" }, { path = "config/base.toml", content = "[access_policy]\nenabled = false\n" }], retro = { suggested_checks = ["Flag runs with more than 3 reads of the same file."], standards_updates = ["Prefer table-driven tests."] } }
+content = { summary = "Tell agents to read each file once.", rationale = "Graded runs waste reads.", edits = [{ path = "factory/skills/base/shared_process.md", content = "# Base skill: shared process\n- Keep diffs small.\n- Read each file once; reuse what you read.\n" }, { path = "config/base.toml", content = "[limits]\nmax_attempts = 99\n" }], retro = { suggested_checks = ["Flag runs with more than 3 reads of the same file."], standards_updates = ["Prefer table-driven tests."] } }
 
 [[steps]]
 run = "frontend-bot"
@@ -33,7 +33,7 @@ mr_description_contains = ["Dropped edits outside the allowed paths: config/base
 [[expect.git.branch_files]]
 path = "platform/software-factory"
 branch = "ai/self-improvement/20260105"
-contains = { "factory/skills/base/shared_process.md" = "Read each file once", "config/base.toml" = "enabled = true" }
+contains = { "factory/skills/base/shared_process.md" = "Read each file once", "config/base.toml" = "max_attempts = 2" }
 [[expect.git.branch_files]]
 path = "platform/software-factory"
 branch = "main"

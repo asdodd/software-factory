@@ -379,10 +379,6 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
     for port in expect.get("instantiated", []):
         if not any(label == port or label.startswith(port + ":") for label in c.instantiated):
             fail(f"{port} was not instantiated")
-    if "denials_at_least" in expect:
-        n = c.metrics.count("access_denied")
-        if n < expect["denials_at_least"]:
-            fail(f"{n} access denials < {expect['denials_at_least']}")
     for name, want in expect.get("metrics", {}).items():
         got = c.metrics.count(name)
         if got != want:
@@ -420,6 +416,16 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
             for var in ho.get("env_excludes", []):
                 if var in obs["env_keys"]:
                     fail(f"harness environment contains {var}")
+        hooks = [h for name in list(c._harnesses) for h in getattr(c._harnesses[name], "hook_results", [])]
+        for want, blocked in ((ho.get("hook_blocked", []), True), (ho.get("hook_allowed", []), False)):
+            for target in want:
+                match = [h for h in hooks if target in json.dumps(h["input"])]
+                if not match:
+                    fail(f"the workspace hook was not run for {target!r}")
+                elif any(h["blocked"] != blocked for h in match):
+                    fail(f"the workspace hook {'allowed' if blocked else 'blocked'} {target!r}: {match}")
+                elif blocked and any("TOPSECRET" in h["message"] for h in match):
+                    fail(f"the hook message for {target!r} leaked file content")
     bot_id = git.identity.id
     replies = [cm.body for cms in git.mr_comments.values() for cm in cms if cm.author.id == bot_id]
     for text in g.get("mr_replies_contain", []):

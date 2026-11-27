@@ -1,6 +1,6 @@
 """Per-run loopback model gateway.
 
-Harnesses (builtin or bring-your-own) get a 127.0.0.1 URL and a per-run token,
+Harnesses (any CLI agent) get a 127.0.0.1 URL and a per-run token,
 never upstream credentials. Requests are translated to the neutral
 ModelRequest and sent through BudgetedModels, so budgets, attribution,
 accounting, and trace capture apply to every harness. The stage's configured

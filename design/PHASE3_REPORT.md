@@ -25,7 +25,7 @@ factory intake --enable intake.email --enable intake.gitlab_comments   # one pol
 
   Skipped mail is counted by reason (metric `email_ignored`) and logged by sender address only.
 - **Drafting.** The full thread and any allowed attachments go to the `intake` model stage, which drafts the title, description, repo guess, components, acceptance criteria and verify steps.
-  - Attachments are checked by the access guard and a size limit before the model sees them. Withheld ones are only counted.
+  - Attachments over the size limit are withheld before the model sees them, and only counted.
   - A repo guess outside the known repos is dropped.
   - The drafting prompt tells the model the thread is untrusted. Only the draft fields are read from its output; anything else it returns (labels, assignee, priority, policy) is ignored.
   - If drafting fails, the subject and body are used.

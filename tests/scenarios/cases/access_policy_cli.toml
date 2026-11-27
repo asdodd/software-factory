@@ -1,5 +1,0 @@
-name = "the access policy cannot be disabled from the CLI"
-[overrides]
-set = ["access_policy.enabled=false"]
-[expect]
-startup_error = "access_policy.enabled can only be set in the global config file"

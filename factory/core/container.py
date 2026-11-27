@@ -30,7 +30,7 @@ class Container:
         self.loaded = loaded
         self.base_dir = Path(base_dir or loaded.root)
         self.metrics = Metrics()
-        self.redactor = Redactor(cfg.trace_store.redaction.extra_patterns, cfg.access_policy.deny_patterns)
+        self.redactor = Redactor(cfg.trace_store.redaction.extra_patterns)
         self.secrets = SecretResolver(dict(os.environ if env is None else env), self.redactor)
         self.ctx = AdapterContext(cfg, self.secrets, self.redactor, self.base_dir, self.metrics)
         self.instantiated: list[str] = []

@@ -15,6 +15,13 @@ factory = "factory.cli.main:main"
 [tool.setuptools.packages.find]
 include = ["factory*"]
 
+[tool.setuptools.package-data]
+factory = [
+  "skills/*.toml", "skills/base/*.md",
+  "agent_kit/AGENTS.md", "agent_kit/.claude/settings.json", "agent_kit/.claude/hooks/*.py",
+  "agent_kit/.claude/skills/*/SKILL.md", "agent_kit/.clinerules/hooks/*",
+]
+
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "ruff==0.16.9", "boto3==1.44.12"]
 s3 = ["boto3==1.44.12"]

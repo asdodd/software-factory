@@ -5,6 +5,7 @@
   factory agents
   factory run (--agent NAME | --all-agents) [--loop]
   factory scenario run FILE...
+  factory workspace init [DIR] | add URL | sync [NAME...] | list | ticket KEY
 
 Common options: --profile, --config-dir, --enable, --disable, --set k=v, --dry-run, --output-mode."""
 
@@ -31,7 +32,7 @@ class RedactingFilter(logging.Filter):
         self.redactor = redactor
 
     def filter(self, record: logging.LogRecord) -> bool:
-        record.msg = self.redactor.redact(record.getMessage(), policy=False).text
+        record.msg = self.redactor.redact(record.getMessage()).text
         record.args = ()
         return True
 
@@ -87,6 +88,26 @@ def parser() -> argparse.ArgumentParser:
     ssub = scen.add_subparsers(dest="action", required=True)
     p = ssub.add_parser("run")
     p.add_argument("files", nargs="+")
+    wsp = sub.add_parser("workspace", help="a local workspace: the agent kit plus repos you clone, no pipeline")
+    wsub = wsp.add_subparsers(dest="action", required=True)
+    p = wsub.add_parser("init", help="install the agent kit and a workspace.toml into DIR (default: here)")
+    p.add_argument("dir", nargs="?", default=".")
+    p = wsub.add_parser("add", help="list a repo in workspace.toml and clone it")
+    p.add_argument("url")
+    p.add_argument("--name", default="", help="directory under repos/ (default: from the URL)")
+    p.add_argument("--branch", default="")
+    p.add_argument("--no-clone", action="store_true")
+    p.add_argument("--root", help="workspace root (default: found from the current directory)")
+    p = wsub.add_parser("sync", help="clone missing repos and fast-forward the rest")
+    p.add_argument("names", nargs="*")
+    p.add_argument("--root")
+    p = wsub.add_parser("list", help="repos in the workspace and whether they are cloned")
+    p.add_argument("--root")
+    p = wsub.add_parser("ticket", help="write a ticket's text into tickets/KEY and clone its repos")
+    p.add_argument("key")
+    p.add_argument("--no-clone", action="store_true")
+    p.add_argument("--root")
+    _common(p)
     return root
 
 
@@ -279,12 +300,41 @@ def cmd_scenario(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_workspace(args) -> int:
+    from factory import local
+
+    try:
+        if args.action == "init":
+            lines = local.init(Path(args.dir))
+            lines.append(f"workspace ready at {Path(args.dir).resolve()}: add repos with `factory workspace add URL`, "
+                         "then start your agent there")
+        else:
+            root = Path(args.root).resolve() if args.root else local.find_root(Path.cwd())
+            if args.action == "add":
+                entry = local.add(root, args.url, args.name, args.branch)
+                lines = [f"listed {entry.name}"] + ([] if args.no_clone else local.sync(root, [entry.name]))
+            elif args.action == "sync":
+                lines = local.sync(root, args.names)
+            elif args.action == "list":
+                lines = local.status(root)
+            else:
+                from factory.core.container import Container
+
+                tickets = Container(_load(args)).port("ticket_system")
+                lines = local.ticket(root, tickets, args.key, clone=not args.no_clone)
+    except local.WorkspaceError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     args = parser().parse_args(argv)
     handlers = {"config": cmd_config, "features": cmd_features, "agents": cmd_agents, "run": cmd_run,
                 "scenario": cmd_scenario, "intake": cmd_intake,
-                "metrics": cmd_metrics, "grade": cmd_grade, "improve": cmd_improve}
+                "metrics": cmd_metrics, "grade": cmd_grade, "improve": cmd_improve, "workspace": cmd_workspace}
     try:
         return handlers[args.command](args)
     except ConfigError as exc:

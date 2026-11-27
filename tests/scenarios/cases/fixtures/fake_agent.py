@@ -1,4 +1,4 @@
-"""A stand-in for a bring-your-own CLI agent. It checks what it can see, asks
+"""A stand-in for a bring-your-own CLI agent. It checks its workspace, asks
 the factory's loopback gateway for an edit, applies it, and reports."""
 
 import json
@@ -8,14 +8,11 @@ import sys
 import urllib.request
 
 problems = []
-for root, dirs, files in os.walk("."):
-    dirs[:] = [d for d in dirs if d != ".git"]
-    for name in files:
-        if "proprietary" in os.path.join(root, name).lower():
-            problems.append(f"saw {os.path.join(root, name)}")
-history = subprocess.run(["git", "log", "-p", "--all"], capture_output=True, text=True).stdout
-if "TOPSECRET" in history:
-    problems.append("history leaks restricted content")
+for kit in (".claude/settings.json", ".claude/hooks/restricted_files.py", ".claude/skills/restricted-files/SKILL.md"):
+    if not os.path.isfile(kit):
+        problems.append(f"kit file {kit} missing")
+if subprocess.run(["git", "rev-list", "--all", "--count"], capture_output=True, text=True).stdout.strip() != "1":
+    problems.append("history beyond the baseline commit")
 for var in os.environ:
     if var.startswith(("FACTORY_", "AWS_", "SIM_")) or var.lower().endswith("_proxy"):
         problems.append(f"env leaks {var}")
@@ -34,7 +31,15 @@ if dialect == "anthropic_messages":
     text = "".join(json.loads(line[6:])["delta"]["text"] for line in raw.splitlines()
                    if line.startswith("data: ") and '"text_delta"' in line)
 else:
-    body = {"model": model, "messages": [{"role": "system", "content": task},
+    history = []
+    if os.environ.get("TOOL_HISTORY"):
+        # Earlier turns of an agent's tool loop: two tool results that worked, one that failed.
+        for i, (name, output) in enumerate((("read", "def add(a, b): ..."), ("read", "error: no such file"),
+                                            ("write", "ok"))):
+            history += [{"role": "assistant", "content": None, "tool_calls": [
+                            {"id": f"c{i}", "type": "function", "function": {"name": name, "arguments": "{}"}}]},
+                        {"role": "tool", "tool_call_id": f"c{i}", "content": output}]
+    body = {"model": model, "messages": [{"role": "system", "content": task}, *history,
                                          {"role": "user", "content": "Return the edit as JSON."}]}
     req = urllib.request.Request(url + "/v1/chat/completions", json.dumps(body).encode(),
                                  {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})

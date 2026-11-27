@@ -60,7 +60,7 @@ This list is generated from the validator.
 
 - **`git` 2.20 or later** on the worker box, used for submodule `--depth` and `--jobs`.
 - **The sandbox root** (`plugins.sandbox.settings.root`) on a disk with room for clones.
-- **CLI agents, if used** (`claude`, `codex`, `cline`, `jam`): installed on the worker's `PATH`. Check the Cline flags against the installed version, and override `settings.args` if they differ.
+- **CLI agents** (`claude` by default; `codex`, `cline`, `jam` if used): installed on the worker's `PATH`, with `python3` available for the agent kit's hook. Check the Cline flags against the installed version, and override `settings.args` if they differ.
 - **S3 bucket** (the bucket enforces retention; the factory never deletes):
   - turn on versioning or Object Lock in governance mode;
   - set lifecycle expiry to your classification retention period;

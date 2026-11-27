@@ -5,7 +5,7 @@ def test_config_validate_and_show_redact(capsys):
     assert main(["config", "validate"]) == 0
     assert "config OK" in capsys.readouterr().out
     assert main(["config", "show", "--profile", "sim"]) == 0
-    assert '"deny_patterns"' in capsys.readouterr().out
+    assert '"harness": "scripted"' in capsys.readouterr().out
 
 
 def test_prod_profile_lists_what_to_fill_in(capsys):
@@ -23,6 +23,6 @@ def test_features_and_agents(capsys):
     assert "frontend-bot" in capsys.readouterr().out
 
 
-def test_access_policy_cannot_be_disabled_from_cli(capsys):
+def test_unknown_keys_from_cli_are_errors(capsys):
     assert main(["run", "--agent", "frontend-bot", "--set", "access_policy.enabled=false"]) == 2
-    assert "can only be set in the global config file" in capsys.readouterr().err
+    assert "access_policy: unknown key" in capsys.readouterr().err

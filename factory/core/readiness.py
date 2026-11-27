@@ -35,6 +35,21 @@ def text_field(ticket: Ticket, name: str) -> str:
     return str(value or "").strip()
 
 
+def ticket_repos(ticket: Ticket) -> list[str]:
+    """The repos a ticket names in its repo field: one path, or several separated
+    by commas, whitespace, or new lines (a list field also works). The first is
+    the primary repo. Order is kept; duplicates are dropped."""
+    value = ticket.fields.get("repo")
+    items = [str(v) for v in value] if isinstance(value, (list, tuple)) else [str(value or "")]
+    out: list[str] = []
+    for item in items:
+        for part in re.split(r"[,\s]+", item):
+            part = part.strip().lstrip("-").strip()
+            if part and part not in out:
+                out.append(part)
+    return out
+
+
 def acceptance_items(ticket: Ticket) -> list[str]:
     text = text_field(ticket, "acceptance_criteria")
     items = [line for line in text.splitlines() if _ITEM.match(line)]
@@ -48,9 +63,12 @@ def evaluate(ticket: Ticket, limits: LimitsConfig, repo_scope: list[str] | None 
     failures = []
     for _id, rule, message in checklist():
         if rule == "repo_identified":
-            repo = text_field(ticket, "repo")
-            if not repo or (repo_scope is not None and repo not in repo_scope):
-                failures.append(message if not repo else f"The repo {repo} is not in this agent's scope.")
+            repos = ticket_repos(ticket)
+            outside = [r for r in repos if repo_scope is not None and r not in repo_scope]
+            if not repos:
+                failures.append(message)
+            for repo in outside:
+                failures.append(f"The repo {repo} is not in this agent's scope.")
         elif rule == "acceptance_criteria_stated":
             if not acceptance_items(ticket):
                 failures.append(message)

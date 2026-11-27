@@ -1,14 +1,16 @@
 """Isolated workspaces for harnesses.
 
-The harness gets a copy of the checked-out tree (submodules flattened in as
-plain files, access policy already applied) with git history replaced by one
-baseline commit. The factory diffs the copy against that baseline and carries
-accepted changes into the real clone itself."""
+The harness gets a copy of each checked-out tree (submodules flattened in as
+plain files) with git history replaced by one baseline commit. With one repo,
+the copy is the harness's working directory; with several, each repo is a
+directory under it. The factory diffs each copy against its baseline and
+carries accepted changes into the real clones itself."""
 
 from __future__ import annotations
 
 import os
 import shutil
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,13 +36,25 @@ def local_git() -> Git:
                           author_email="baseline@factory.invalid", allow_protocols="file"))
 
 
-def isolate(clone_root: Path, dest: Path) -> str:
+def repo_dirs(paths: Sequence[str]) -> dict[str, str]:
+    """A directory name per repo path in a multi-repo workspace: the last path
+    segment, or the whole path with '/' as '__' when last segments collide."""
+    last = [p.rstrip("/").rsplit("/", 1)[-1] for p in paths]
+    return {p: (name if last.count(name) == 1 else p.strip("/").replace("/", "__")) for p, name in zip(paths, last, strict=True)}
+
+
+def isolate(clone_root: Path, dest: Path, before_baseline: Callable[[Path], object] | None = None) -> str:
+    """Copy clone_root to dest without history. before_baseline runs on dest
+    before the baseline commit, so what it adds never shows in the diff."""
+
     def ignore(_dir: str, names: list[str]) -> list[str]:
         return [n for n in names if n == ".git"]
 
     if dest.exists():
         shutil.rmtree(dest)
     shutil.copytree(clone_root, dest, symlinks=True, ignore=ignore)
+    if before_baseline is not None:
+        before_baseline(dest)
     git = local_git()
     git.run(["init", "-q", "-b", "baseline"], cwd=dest)
     git.run(["add", "-A", "--force"], cwd=dest)
@@ -53,7 +67,7 @@ def stage_all(git: Git, root: Path, paths: list[str] | None = None) -> None:
     the checkout is invisible to git's stat check, so the cached entries are dropped
     and re-hashed."""
     spec = ["--", *paths] if paths else ["--", "."]
-    git.run(["rm", "-r", "-q", "--cached", "--ignore-unmatch", *spec], cwd=root)
+    git.run(["rm", "-r", "-q", "-f", "--cached", "--ignore-unmatch", *spec], cwd=root)
     git.run(["add", "-A", "--force", *spec], cwd=root)
 
 
@@ -81,8 +95,10 @@ def line_stats(copy_root: Path) -> LineStats:
     return LineStats(added, deleted, lines)
 
 
-def diff_text(copy_root: Path, context: int = 3) -> str:
-    return local_git().run(["diff", "--cached", f"-U{context}", "HEAD"], cwd=copy_root).stdout
+def diff_text(copy_root: Path, context: int = 3, prefix: str = "") -> str:
+    """prefix (e.g. "repo/") is put in front of every path, for multi-repo diffs."""
+    extra = [f"--src-prefix=a/{prefix}", f"--dst-prefix=b/{prefix}"] if prefix else []
+    return local_git().run(["diff", "--cached", f"-U{context}", *extra, "HEAD"], cwd=copy_root).stdout
 
 
 def tracked_files(copy_root: Path) -> list[str]:

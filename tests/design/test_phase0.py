@@ -65,8 +65,7 @@ class ConfigExamplesTest(unittest.TestCase):
         self.assertEqual(cfg.limits.max_tokens_per_ticket, 2_000_000)
         self.assertFalse(cfg.intake.email.allow_updates)
         self.assertFalse(cfg.mr.resolve_threads)
-        self.assertTrue(cfg.access_policy.enabled)
-        self.assertEqual(cfg.access_policy.deny_patterns, ["proprietary"])
+        self.assertEqual(cfg.models.stages.implement.harness, "claude")
         self.assertEqual(cfg.trace_store.s3.endpoint_url, "")
         self.assertEqual(cfg.collaboration.allowed_commenters, schema.CommenterRule())
 
@@ -75,11 +74,12 @@ class ConfigExamplesTest(unittest.TestCase):
             data = load(ROOT / f"config/profiles/{name}.toml")
             self.assertNotIn("allowed_commenters", data.get("collaboration", {}), name)
 
-    def test_agent_overrides_cannot_reach_access_policy(self):
-        fields = {f.name for f in dataclasses.fields(schema.AgentOverrides)}
-        self.assertNotIn("access_policy", fields)
+    def test_no_factory_side_access_policy(self):
+        """Restricted files are the agents' job (the agent kit), so there is no
+        factory config for them anywhere."""
+        self.assertNotIn("access_policy", {f.name for f in dataclasses.fields(schema.FactoryConfig)})
         with self.assertRaises(ConfigError):
-            build(schema.AgentConfig, {"overrides": {"access_policy": {"enabled": False}}})
+            build(schema.FactoryConfig, {"access_policy": {"enabled": False}})
 
 
 class FeatureTableTest(unittest.TestCase):
@@ -101,8 +101,8 @@ class FeatureTableTest(unittest.TestCase):
         for name in ("mr.respond", "mr.auto_fix"):
             self.assertIn("mr.read_comments", FEATURES_BY_NAME[name].requires)
 
-    def test_access_policy_is_not_a_feature(self):
-        self.assertFalse(any(f.name.startswith("access_policy") for f in FEATURES))
+    def test_restricted_files_is_not_a_feature(self):
+        self.assertFalse(any(f.name.startswith(("access_policy", "restricted")) for f in FEATURES))
 
     def test_config_paths_exist_in_schema(self):
         for feature in FEATURES:

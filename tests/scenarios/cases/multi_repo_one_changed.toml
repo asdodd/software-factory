@@ -1,0 +1,48 @@
+name = "in a multi-repo ticket, a repo the agent left alone gets no branch, and gate failures name their repo"
+include = ["_common.toml"]
+
+[[repos]]
+path = "web/design-system"
+[repos.files]
+"tokens.py" = "PRIMARY = '#000'\n"
+".gitlab-ci.yml" = "test:\n  script: true\n"
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+reporter = "alice"
+[tickets.fields]
+repo = "web/portal\nweb/design-system"
+acceptance_criteria = "- multiply(a, b) returns the product"
+verify_steps = "run the tests"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "portal/src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { write = "design-system/.gitlab-ci.yml", content = "test:\n  script: false\n" },
+  { result = { status = "done", summary = "first try" } },
+]
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { write = "design-system/.gitlab-ci.yml", content = "test:\n  script: true\n" },
+  { result = { status = "done", summary = "Added multiply." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.git]
+mrs = 1
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "ai/frontend-bot/SIM-1"
+contains = { "src/calc.py" = "def multiply" }
+[expect.trace]
+includes = ["web/design-system: protected path changed: .gitlab-ci.yml"]

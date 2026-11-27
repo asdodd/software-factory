@@ -24,10 +24,8 @@ MODEL_STAGES = {
     "improve": ("feedback.self_improvement",),
 }
 
-ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "access_guard", "accounting", "state_store", "clock", "id_source",
-                "notifier")
+ALWAYS_PORTS = ("ticket_system", "git_host", "sandbox", "accounting", "state_store", "clock", "id_source", "notifier")
 FEATURE_PORTS = {"mailbox": ("intake.email",), "monitor": ("intake.monitoring", "monitoring")}
-TOOL_LOOP_HARNESSES = frozenset({"harness.builtin"})
 
 
 def effective_rule(config: FactoryConfig, channel: str) -> CommenterRule:
@@ -142,20 +140,10 @@ def _check_harness(prefix: str, name: str, cfg: FactoryConfig, out: list) -> Non
     if needed and needed not in cfg.gateway.dialects:
         out.append(Diagnostic("error", f"{prefix}harness {name!r} needs gateway dialect {needed}; "
                                        "add it to gateway.dialects"))
-    if cfg.access_policy.mode == "deny_read" and h.adapter not in TOOL_LOOP_HARNESSES and not _sandbox_hides_paths(cfg):
-        out.append(Diagnostic(
-            "error",
-            f"{prefix}access_policy.mode = deny_read cannot be enforced for harness {name!r}; "
-            "use mode = strip or a sandbox that hides paths",
-        ))
-
-
-def _sandbox_hides_paths(cfg: FactoryConfig) -> bool:
-    try:
-        cls = resolve_class(cfg.plugins.sandbox.adapter, cfg.plugins.aliases)
-    except PluginError:
-        return False
-    return bool(getattr(cls, "HIDES_PATHS", False))
+    hooks = getattr(cls, "native_hooks", None)
+    if hooks is not None and not hooks(h.settings):
+        out.append(Diagnostic("warning", f"{prefix}harness {name!r} has no pre-tool-use hook for the restricted-files "
+                                         "skill; only the skill and AGENTS.md apply"))
 
 
 OPTIONAL_EMPTY = frozenset({"ca_bundle_path", "session_token", "prefix", "kms_key_id", "region", "default_project",
@@ -215,8 +203,6 @@ def check(loaded: LoadedConfig) -> list[Diagnostic]:
 
     if loaded.features.on("feedback.self_improvement") and not cfg.feedback.self_improvement.repo:
         out.append(Diagnostic("error", "feedback.self_improvement.repo is required when self-improvement is on"))
-    if not cfg.access_policy.enabled:
-        out.append(Diagnostic("alert", "access_policy.enabled is false: the no-proprietary-files base skill is NOT enforced"))
     if cfg.intake.email.allow_updates:
         out.append(Diagnostic("warning", "intake.email.allow_updates is true: email replies can update tickets"))
 

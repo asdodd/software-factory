@@ -21,7 +21,6 @@ BUILTIN_SECRET_PATTERNS: tuple[str, ...] = (
 )
 
 SECRET_PLACEHOLDER = "[REDACTED]"
-POLICY_PLACEHOLDER = "[REDACTED:access-policy]"
 
 
 @dataclass(frozen=True)
@@ -33,20 +32,17 @@ class Redacted:
 class Redactor:
     """Thread-safe. Known secret values (resolved at runtime) are always scrubbed."""
 
-    def __init__(self, extra_patterns: Iterable[str] = (), policy_patterns: Iterable[str] = ()) -> None:
+    def __init__(self, extra_patterns: Iterable[str] = ()) -> None:
         self._lock = threading.Lock()
         self._values: set[str] = set()
         self._patterns = [re.compile(p) for p in (*BUILTIN_SECRET_PATTERNS, *extra_patterns)]
-        policy = [re.escape(p) for p in policy_patterns if p]
-        self._policy = re.compile(r"[^\n]*(?:" + "|".join(policy) + r")[^\n]*", re.IGNORECASE) if policy else None
 
     def add_secret(self, value: str) -> None:
         if value and len(value) >= 4:
             with self._lock:
                 self._values.add(value)
 
-    def redact(self, text: str, policy: bool = True) -> Redacted:
-        """policy=False scrubs secrets only: comments may name restricted paths."""
+    def redact(self, text: str) -> Redacted:
         count = 0
         with self._lock:
             values = sorted(self._values, key=len, reverse=True)
@@ -56,9 +52,6 @@ class Redactor:
                 text = text.replace(value, SECRET_PLACEHOLDER)
         for pattern in self._patterns:
             text, n = pattern.subn(SECRET_PLACEHOLDER, text)
-            count += n
-        if policy and self._policy is not None:
-            text, n = self._policy.subn(POLICY_PLACEHOLDER, text)
             count += n
         return Redacted(text, count)
 

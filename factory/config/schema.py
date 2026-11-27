@@ -32,7 +32,6 @@ class PluginsConfig:
     git_host: PluginSelection = field(default_factory=PluginSelection)
     mailbox: PluginSelection = field(default_factory=PluginSelection)
     sandbox: PluginSelection = field(default_factory=PluginSelection)
-    access_guard: PluginSelection = field(default_factory=PluginSelection)
     notifier: PluginSelection = field(default_factory=PluginSelection)
     monitor: PluginSelection = field(default_factory=PluginSelection)
     accounting: PluginSelection = field(default_factory=PluginSelection)
@@ -131,7 +130,6 @@ class LimitsConfig:
     max_tokens_per_ticket: int = 2_000_000
     max_files_changed: int = 15
     max_diff_lines: int = 600
-    max_denied_access_attempts: int = 5
     max_ticket_chars: int = 12000
     max_acceptance_criteria: int = 12
 
@@ -231,18 +229,6 @@ class TraceStoreConfig:
 
 
 @dataclass(frozen=True)
-class AccessPolicyConfig:
-    """`enabled` is only honoured from the global base config file."""
-
-    enabled: bool = True
-    deny_patterns: list[str] = field(default_factory=lambda: ["proprietary"])
-    match_on: list[Literal["path", "content"]] = field(default_factory=lambda: ["path", "content"])
-    case_insensitive: bool = True
-    content_scan_bytes: int = 8192
-    mode: Literal["strip", "deny_read"] = "strip"
-
-
-@dataclass(frozen=True)
 class EmailIntakeConfig:
     """address: the bot's own address. Mail is read only when the bot is in To or Cc.
     allowlisted_senders may use shell-style wildcards (*@team.example).
@@ -332,7 +318,7 @@ class StageModel:
 class StageModels:
     triage: StageModel = field(default_factory=StageModel)
     spec: StageModel = field(default_factory=StageModel)
-    implement: StageModel = field(default_factory=lambda: StageModel(harness="builtin"))
+    implement: StageModel = field(default_factory=lambda: StageModel(harness="claude"))
     review: StageModel = field(default_factory=StageModel)
     intake: StageModel = field(default_factory=StageModel)
     grading: StageModel = field(default_factory=StageModel)
@@ -455,7 +441,6 @@ class FactoryConfig:
     limits: LimitsConfig = field(default_factory=LimitsConfig)
     git: GitConfig = field(default_factory=GitConfig)
     trace_store: TraceStoreConfig = field(default_factory=TraceStoreConfig)
-    access_policy: AccessPolicyConfig = field(default_factory=AccessPolicyConfig)
     intake: IntakeConfig = field(default_factory=IntakeConfig)
     models: ModelsConfig = field(default_factory=ModelsConfig)
     harnesses: dict[str, HarnessConfig] = field(default_factory=dict)
@@ -489,8 +474,8 @@ class ClaimConfig:
 
 @dataclass(frozen=True)
 class AgentOverrides:
-    """Sections an agent may override. Anything not listed here, including
-    access_policy.enabled, cannot be overridden per agent."""
+    """Sections an agent may override. Anything not listed here cannot be
+    overridden per agent."""
 
     labels: dict[str, str] = field(default_factory=dict)
     output: dict[str, object] = field(default_factory=dict)
@@ -511,7 +496,6 @@ class AgentConfig:
     repos: list[str] = field(default_factory=list)
     filter: FilterConfig = field(default_factory=FilterConfig)
     claim: ClaimConfig = field(default_factory=ClaimConfig)
-    extra_deny_patterns: list[str] = field(default_factory=list)
     overrides: AgentOverrides = field(default_factory=AgentOverrides)
 
 
@@ -539,12 +523,11 @@ class MutationRules:
 @dataclass(frozen=True)
 class RepoRules:
     """Per-repo layer, read from `.factory/rules.toml` in the repo. It may add
-    rules and deny patterns, never relax global ones."""
+    rules, never relax global ones."""
 
     standards: list[str] = field(default_factory=list)
     commands: RepoCommands = field(default_factory=RepoCommands)
     evidence: list[str] = field(default_factory=list)
-    extra_deny_patterns: list[str] = field(default_factory=list)
     protected_paths: list[str] = field(default_factory=list)
     command_timeout_seconds: int = 900
     coverage_report: str = ""

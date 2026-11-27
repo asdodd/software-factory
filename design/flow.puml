@@ -61,19 +61,19 @@ if (triage) then (hard)
   |Model stages|
 else (easy)
 endif
-:Clone + submodules (fixed argv git);
-:AccessGuard.scan_workspace\n(strip | deny_read);
-:Isolated copy: access policy applied,\ngit history replaced by one baseline commit;
-:Render instructions file: ticket, spec,\nbase skills, global + repo rules;
+:Clone every repo the ticket names\n+ submodules (fixed argv git);
+:Isolated copy per repo (one directory each\nwhen several), history replaced by one baseline commit;
+:Install the agent kit: restricted-files skill,\nAGENTS.md / CLAUDE.md, Claude Code + Cline hooks;
+:Render instructions file: ticket, spec,\nbase skills, repos, global + repo rules;
 :Start loopback model gateway\n(per-run token, budgets, redaction, trace);
-:Harness implements\n(builtin or bring-your-own CLI);
-:Factory diffs copy vs baseline, rejects\n.git / submodule / restricted / protected paths,\napplies to agent branch in real clone;
+:CLI agent implements\n(Claude Code, Codex, Cline, or any command);\nits own hooks enforce the skill;
+:Factory checks the kit is untouched, diffs each\ncopy vs baseline, rejects .git / submodule /\nprotected paths, applies to each repo's branch;
 :Lint + tests in sandbox (factory-run);
 :Review (different model/context):\nstandards, blast radius, arch diff;
 :Verify: evidence from real code path;
 
 |PR gates (deterministic)|
-:Mechanical gates: lint, coverage,\nmutation, protected paths,\naccess policy, submodule pointers,\nMR template sections;
+:Mechanical gates per repo: lint, coverage,\nmutation, protected paths, submodule pointers,\nMR template sections; size over the ticket;
 if (Gates pass?) then (no)
   if (attempts < max_attempts\nAND spend < cap?) then (yes)
     :Retry implement;
@@ -86,7 +86,7 @@ endif
 
 |Push library (deterministic, dry_run aware)|
 if (output.mode) then (merge_request)
-  :Push branch, open MR with template;
+  :Push branch, open an MR per changed repo;
   :Transition -> in_review;
 else (branch_only)
   :Push branch;

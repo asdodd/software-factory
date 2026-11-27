@@ -1,22 +1,20 @@
-name = "metrics: tool-call success rate from the builtin harness trace"
+name = "metrics: tool-call success rate from the tool results a CLI agent sends through the gateway"
 include = ["_common.toml", "_ticket.toml"]
+
+[settings.harnesses.fake-cli]
+adapter = "harness.command"
+[settings.harnesses.fake-cli.settings]
+argv = ["python3", "{scenario_dir}/fixtures/fake_agent.py"]
+env = { GATEWAY_URL = "{gateway_url}", GATEWAY_TOKEN = "{gateway_token}", MODEL = "{model}", INSTRUCTIONS = "{instructions_file}", RESULT = "{result_file}", DIALECT = "openai_chat", TOOL_HISTORY = "1" }
+
 [settings.models.stages.implement]
 provider = "scripted"
 model = "sim-large"
-harness = "builtin"
+harness = "fake-cli"
 
 [[model]]
 stage = "implement"
-tool_calls = [{ name = "read_file", arguments = { path = "src/calc.py" } }]
-[[model]]
-stage = "implement"
-tool_calls = [{ name = "read_file", arguments = { path = "missing.py" } }]
-[[model]]
-stage = "implement"
-tool_calls = [{ name = "write_file", arguments = { path = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" } }]
-[[model]]
-stage = "implement"
-tool_calls = [{ name = "finish", arguments = { status = "done", summary = "Added multiply." } }]
+content = { path = "src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" }
 
 [[steps]]
 run = "frontend-bot"

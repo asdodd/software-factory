@@ -1,0 +1,57 @@
+name = "a ticket naming two repos clones both side by side; each changed repo gets its own gated branch and MR"
+include = ["_common.toml"]
+
+[[repos]]
+path = "web/design-system"
+[repos.files]
+"tokens.py" = "PRIMARY = '#000'\n"
+"tests/test_tokens.py" = "import sys, unittest\nsys.path.insert(0, '.')\nimport tokens\n\nclass T(unittest.TestCase):\n    def test_primary(self):\n        self.assertTrue(tokens.PRIMARY)\n"
+".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-m\", \"unittest\", \"discover\", \"-s\", \"tests\"]]\n"
+
+[[tickets]]
+key = "SIM-1"
+summary = "Add multiply and an accent token"
+status = "Ready for AI"
+labels = ["ai-ready-frontend"]
+components = ["ui"]
+reporter = "alice"
+[tickets.fields]
+repo = "web/portal, web/design-system"
+acceptance_criteria = "- multiply(a, b) returns the product\n- an ACCENT token exists"
+
+[[harness]]
+ticket = "SIM-1"
+actions = [
+  { observe = true },
+  { write = "portal/src/calc.py", content = "def add(a, b):\n    return a + b\n\n\ndef multiply(a, b):\n    return a * b\n" },
+  { write = "design-system/tokens.py", content = "PRIMARY = '#000'\nACCENT = '#f60'\n" },
+  { result = { status = "done", summary = "Added multiply and ACCENT." } },
+]
+
+[[steps]]
+run = "frontend-bot"
+
+[expect]
+outcomes = ["mr_opened"]
+[expect.harness_observed]
+files_include = ["portal/src/calc.py", "design-system/tokens.py", "AGENTS.md", ".claude/hooks/restricted_files.py"]
+instructions_contain = ["This ticket spans several repos", "web/portal: ./portal/", "web/design-system: ./design-system/",
+                        "Repo commands: web/design-system (run in ./design-system/)"]
+[[expect.tickets]]
+key = "SIM-1"
+status = "In Review"
+comments_contain = ["Merge request (web/portal)", "Merge request (web/design-system)"]
+[expect.git]
+mrs = 2
+pushed_branches = ["ai/frontend-bot/SIM-1"]
+mr_description_contains = ["This ticket also changes: web/design-system", "This ticket also changes: web/portal"]
+[[expect.git.branch_files]]
+path = "web/portal"
+branch = "ai/frontend-bot/SIM-1"
+contains = { "src/calc.py" = "def multiply" }
+absent = ["AGENTS.md", "portal/src/calc.py"]
+[[expect.git.branch_files]]
+path = "web/design-system"
+branch = "ai/frontend-bot/SIM-1"
+contains = { "tokens.py" = "ACCENT" }
+absent = ["AGENTS.md", ".claude/settings.json"]
