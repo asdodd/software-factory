@@ -1,9 +1,10 @@
-"""The agent kit: agent-native files that carry the restricted-files skill.
+"""The agent kit: agent-native files that carry the restricted-files and pr skills.
 
 The same files sit at the root of this repo (for local use) and are installed
 into every factory workspace before a harness runs:
 
   .claude/skills/restricted-files/SKILL.md   the skill (Claude Code loads it natively)
+  .claude/skills/pr/SKILL.md                 the shared PR description template
   .claude/hooks/restricted_files.py          pre-tool-use hook that blocks restricted reads
   .claude/settings.json                      wires the hook and path deny rules (merged if present)
   .clinerules/hooks/PreToolUse               the same hook for Cline
@@ -24,6 +25,7 @@ SENTINEL = "agent-kit:restricted-files"
 COPIED = (
     ".claude/hooks/restricted_files.py",
     ".claude/skills/restricted-files/SKILL.md",
+    ".claude/skills/pr/SKILL.md",
     ".clinerules/hooks/PreToolUse",
 )
 SETTINGS = ".claude/settings.json"

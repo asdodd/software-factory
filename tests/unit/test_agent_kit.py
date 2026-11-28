@@ -168,3 +168,25 @@ def test_repo_root_carries_the_same_kit():
         assert (ROOT / rel).read_bytes() == (agent_kit.KIT_ROOT / rel).read_bytes(), rel
     for rel in agent_kit.NOTES:
         assert (agent_kit.KIT_ROOT / "AGENTS.md").read_text().strip() in (ROOT / rel).read_text(), rel
+
+
+def test_pr_skill_template_matches_the_merge_request_gate():
+    """A PR written from the kit's pr skill passes the same template gate as a factory MR."""
+    import re
+
+    from factory.core import gates
+
+    skill = (agent_kit.KIT_ROOT / ".claude/skills/pr/SKILL.md").read_text()
+    template = re.search(r"```markdown\n(.*?)\n```", skill, re.S).group(1)
+    assert re.findall(r"^## (.+)$", template, re.M) == list(gates.MR_SECTIONS)
+    assert gates.check_template(template).passed
+    assert gates.check_template(template.replace("## Architecture diff", "## Diagram")).failures == [
+        "MR template section missing: Architecture diff"]
+
+
+def test_install_ships_the_pr_skill_and_verify_guards_it(tmp_path):
+    digests = agent_kit.install(tmp_path)
+    skill = tmp_path / ".claude/skills/pr/SKILL.md"
+    assert skill.read_bytes() == (agent_kit.KIT_ROOT / ".claude/skills/pr/SKILL.md").read_bytes()
+    skill.write_text("## Anything goes\n")
+    assert agent_kit.verify(tmp_path, digests) == [".claude/skills/pr/SKILL.md"]

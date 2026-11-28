@@ -11,6 +11,7 @@ The kit lives in `factory/agent_kit/` and has these files:
 | File | What it does |
 |---|---|
 | `.claude/skills/restricted-files/SKILL.md` | The skill. Claude Code loads it natively. |
+| `.claude/skills/pr/SKILL.md` | The shared PR description template. Its headings are the factory's required merge request sections, so hand-written PRs and factory MRs read the same. |
 | `.claude/hooks/restricted_files.py` | A pre-tool-use hook (stdlib Python, no factory import). It blocks reads, searches, edits, and overwrites of files whose path or content carries the marker. It also blocks shell commands that name such files or search over them. It prints paths only, never content, and it fails closed. |
 | `.claude/settings.json` | Wires the hook for `Read`, `Edit`, `Write`, `Grep`, `Glob`, `Bash` and the notebook tools, and adds `permissions.deny` rules for marked paths. |
 | `.clinerules/hooks/PreToolUse` | Runs the same hook for Cline (`--format cline`). |
