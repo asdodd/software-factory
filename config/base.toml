@@ -49,27 +49,34 @@ version = "0.0.1"              # pinned; distributed through the internal mirror
 "id_source.uuid"         = "factory.core.clock:UuidIdSource"
 "id_source.sequential"   = "factory.adapters.fake.clock:SequentialIdSource"
 
-# Jira status and workflow mapping. Keys on the left are the factory's logical
-# states (fixed); values on the right are your Jira's names (config).
-# Profiles fill these in; they are left empty here on purpose.
+# Jira status mapping. Humans own the workflow: the factory claims tickets
+# from the "ready" status and may move a ticket to "in_progress", nothing else.
+# Every other state (bounced, waiting on a spec, in review, blocked, failed,
+# stalled) is a label below. Profiles fill the statuses in.
 [workflow]
 claim_from = ["ready"]
 ticket_url_template = ""                 # e.g. "https://jira.internal/browse/{key}"; used in replies
-# [workflow.statuses]   ready = "...", in_progress = "...", spec_review = "...",
-#                       in_review = "...", needs_info = "...", blocked = "...",
-#                       stalled = "...", failed = "...", done = "..."
+# [workflow.statuses]   ready = "Open", in_progress = "In Progress"
 # [workflow.transitions] optional: logical state -> native transition name
 # [workflow.fields]      logical field -> native custom field id:
 #                       lease_owner, lease_expires, repo, acceptance_criteria,
 #                       verify_steps, sponsor_team, source_ref, fingerprint
 # [workflow.link_types]  relates, blocks, duplicates -> native link type names
 
-[labels]           # global defaults; each agent may override
-ready = ""
-failed = ""
-needs_info = ""
-stalled = ""
-spec_approved = ""
+# Every label the factory reads or writes. Change them here, per profile, or
+# per agent ([overrides.labels]). Any value may contain {agent}, replaced by the
+# agent's name (e.g. ready = "ai-ready-{agent}"). A ticket that carries any
+# state label (needs_info .. stalled) is never claimed as new work.
+[labels]
+ready = "ai-ready"                       # a human applies it: the ticket may be worked
+claimed = "ai-claimed-{agent}"           # lock while an agent holds the ticket; must contain {agent}
+needs_info = "ai-needs-info"             # bounced as not ready, or waiting on answers
+spec_review = "ai-spec-review"           # a spec is posted, waiting for approval
+spec_approved = "ai-spec-approved"       # a human applies it to approve the spec
+in_review = "ai-in-review"               # the merge request (or branch) is ready for a human
+blocked = "ai-blocked"                   # needs a human decision
+failed = "ai-failed"                     # gave up; a human reviews the trace
+stalled = "ai-stalled"                   # no answer in time; the ticket stays in progress
 
 [collaboration]
 factory_identity = ""  # the account the factory posts as; its comments are never read as replies
@@ -94,7 +101,6 @@ poll_interval_seconds = 300
 stall_timeout_hours = 72
 max_question_rounds = 3
 comment_rate_limit_per_hour = 20
-needs_info_action = "label"             # label | status
 lease_while_paused = "release"          # hold | release
 
 [mr]                                     # only valid with output.mode = merge_request
@@ -153,8 +159,8 @@ address = ""                             # the bot's mailbox; mail is read only 
 allow_updates = false                    # email never updates tickets or agent context
 auto_label = false                       # false = draft-only, a human applies the label
 allowlisted_senders = []                 # wildcards allowed: "*@team.example"
-require_authenticated_sender = false     # true: allowlist counts only with dkim/dmarc pass in Authentication-Results
-user_map = {}                            # "alice@team.example" = "alice"
+require_authenticated_sender = false     # false: the From: header is trusted. true: also needs dkim/dmarc pass
+# The reporter is the Jira user found by the sender's address (one user search per new ticket).
 max_reply_recipients = 10                # more than this, or a mailing list: reply to the sender only
 max_attachment_bytes = 200000
 [intake.gitlab]

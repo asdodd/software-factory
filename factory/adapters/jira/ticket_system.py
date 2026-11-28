@@ -93,6 +93,7 @@ class JiraTicketSystem:
         self.transition_names = {statuses[k]: v for k, v in transition_names.items() if k in statuses}
         self.resolve_groups = resolve_groups
         self._groups: dict[str, frozenset[str]] = {}
+        self._by_email: dict[str, Principal | None] = {}
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, object], ctx: AdapterContext,
@@ -131,6 +132,19 @@ class JiraTicketSystem:
             except NotFound:
                 self._groups[name] = frozenset()
         return self._groups[name]
+
+    def find_user_by_email(self, email: str) -> Principal | None:
+        """Server/Data Center: user/search matches username, name, or email, so
+        results are narrowed to an exact, active email match. Cached per run."""
+        email = email.strip().lower()
+        if not email:
+            return None
+        if email not in self._by_email:
+            docs = self.http.request("GET", f"{API}/user/search",
+                                     {"username": email, "maxResults": "20"}).json() or []
+            exact = [d for d in docs if str(d.get("emailAddress", "")).lower() == email and d.get("active", True)]
+            self._by_email[email] = self._principal(exact[0]) if len(exact) == 1 else None
+        return self._by_email[email]
 
     def _ticket(self, doc: Mapping) -> Ticket:
         f = doc["fields"]

@@ -7,3 +7,4 @@ components = ["ui"]
 [tickets.fields]
 repo = "web/secure"
 acceptance_criteria = "- multiply(a, b) returns the product"
+verify_steps = "multiply(4, 5) returns 20"

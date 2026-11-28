@@ -5,7 +5,7 @@ profile = "sim"
 
 [plugins.ticket_system]
 adapter = "ticket_system.fake"
-settings = { fixtures = "tests/scenarios/fixtures/tickets.toml" }
+settings = { fixtures = "tests/scenarios/fixtures/tickets.toml", initial_status = "Ready for AI", users = { "alice@sim.invalid" = "alice", "bob@sim.invalid" = "bob" } }
 
 [plugins.git_host]
 adapter = "git_host.fake"
@@ -46,13 +46,6 @@ adapter = "id_source.sequential"
 [workflow.statuses]
 ready = "Ready for AI"
 in_progress = "In Progress"
-spec_review = "Spec Review"
-in_review = "In Review"
-needs_info = "Waiting for Info"
-blocked = "Blocked"
-stalled = "Open"
-failed = "Open"
-done = "Done"
 
 [workflow]
 ticket_url_template = "sim://jira/browse/{key}"
@@ -75,10 +68,6 @@ duplicates = "Duplicate"
 
 [labels]
 ready = "ai-ready"
-failed = "ai-failed"
-needs_info = "ai-needs-info"
-stalled = "ai-stalled"
-spec_approved = "ai-spec-approved"
 
 [collaboration]
 factory_identity = "svc-factory"
@@ -91,7 +80,6 @@ include_reporter = true
 [intake.email]
 address = "factory@sim.invalid"
 allowlisted_senders = ["alice@sim.invalid", "*@trusted.sim.invalid"]
-user_map = { "alice@sim.invalid" = "alice", "bob@sim.invalid" = "bob" }
 default_project = "SIM"
 default_issue_type = "Task"
 

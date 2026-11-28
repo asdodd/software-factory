@@ -18,7 +18,6 @@ from typing import TYPE_CHECKING
 from factory.config.checks import effective_rule
 from factory.core.writes import Note
 from factory.ports.types import (
-    LogicalStatus,
     MergeRequestState,
     Message,
     Outcome,
@@ -117,10 +116,10 @@ def stall(w: Worker, ticket: Ticket, why: str) -> RunReport:
 
     labels = w.cfg.labels
     w.writes.set_labels(ticket.key, add=[labels.stalled], remove=[labels.needs_info])
-    w.writes.transition(ticket.key, LogicalStatus.STALLED)
     w.claimer.release(ticket.key)
     w.writes.comment(ticket.key, "stalled", Note("Stalled", "stalled", done=why,
-                                                 next="A human should pick this up or re-apply the ready label."),
+                                                 next=f"A human should pick this up, or remove the {labels.stalled} "
+                                                      "label once the ticket is clear."),
                      f"stall:{ticket.key}:{w.clock.now().isoformat()}")
     return RunReport(ticket.key, Outcome.STALLED, why)
 
@@ -237,9 +236,10 @@ def handle_comment(w: Worker, ticket: Ticket, repo: RepoRef, info: dict, comment
         return []
     if kind == "change_request":
         if not w.features.on("mr.auto_fix"):
-            if w.features.on("mr.respond"):
-                reply("Noted. Automatic fixes are off for this agent, so a human will make this change.", "noted")
-            return []
+            # Always say so, even with mr.respond off, so the request is not silently dropped.
+            reply("Noted. Automatic fixes are off for this agent, so a human will make this change.", "human-fix")
+            w.metrics.incr("mr_changes_left_for_human", agent=w.name)
+            return [f"Change request left for a human (automatic fixes are off): {body[:200]}"]
         if int(info.get("fix_rounds", 0)) >= mr_cfg.max_fix_rounds:
             reply(f"I have reached the limit of {mr_cfg.max_fix_rounds} fix rounds on this merge request; "
                   "a human should take it from here.", "limit")

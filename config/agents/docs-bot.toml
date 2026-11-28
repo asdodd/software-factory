@@ -6,7 +6,6 @@ repos = ["docs/handbook"]
 
 [filter]
 labels_any = ["ai-ready-docs"]
-labels_none = ["ai-failed"]
 projects = ["SIM"]
 components = ["docs"]
 

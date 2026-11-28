@@ -15,7 +15,7 @@ message = "Acceptance criteria are not stated."
 [[checks]]
 id = "verify"
 rule = "verification_known"
-message = "How to verify is not stated, and the repo rules file does not define verify or test commands."
+message = "How to verify is not stated, and the repo has no CI config and no factory test or verify commands."
 
 [[checks]]
 id = "bounded"

@@ -12,7 +12,8 @@ run = "frontend-bot"
 outcomes = ["branch_pushed"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 comments_contain = ["Branch: ai/frontend-bot/SIM-1", "Compare: fake://web/portal/-/compare/main...ai/frontend-bot/SIM-1", "## What changed", "## Blast radius", "## How verified"]
 [expect.git]
 mrs = 0

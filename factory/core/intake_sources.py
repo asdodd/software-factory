@@ -11,14 +11,22 @@ Email rules:
 - Reply only to the original sender and people already on the thread, and only
   to the sender when the thread is a list or has too many recipients.
 - Replies on a thread that already has a ticket never update it unless
-  intake.email.allow_updates is true."""
+  intake.email.allow_updates is true.
+- The From: header is trusted unless require_authenticated_sender is on.
+- The reporter is the ticket-system user with the sender's address.
+- Duplicates: the same Message-ID (redelivery, or one message reaching the
+  mailbox twice), the same thread, and the same request in a new thread (sent
+  again, or forwarded by someone else: same normalized subject and body within
+  dedupe_window_days) all point at the first ticket."""
 
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import logging
 import re
+from datetime import datetime, timedelta
 from email.utils import parseaddr
 
 from factory.core.budget import BudgetedModels
@@ -51,6 +59,32 @@ def _headers(msg: MailMessage) -> dict[str, str]:
     return {k.lower(): v for k, v in msg.headers.items()}
 
 
+def message_key(message_id: str) -> str:
+    return message_id.strip().strip("<>").strip().lower()
+
+
+_SUBJECT_PREFIX = re.compile(r"^\s*((re|fwd?|aw|wg|sv|tr)\s*(\[\d+\])?\s*:\s*)+", re.I)
+_FORWARD_LINE = re.compile(r"^(-{2,}.*(forward|original).*-{2,}|begin forwarded message:?|"
+                           r"(from|sent|date|to|cc|subject):.*|on .+ wrote:)$", re.I)
+MIN_CONTENT_CHARS = 20
+
+
+def content_key(subject: str, body: str) -> str:
+    """Sender-independent fingerprint of a request: subject without Re:/Fwd:
+    prefixes, body without quote markers, forward headers, or spacing. Empty
+    when there is too little text to tell requests apart."""
+    lines = []
+    for line in body.splitlines():
+        line = line.lstrip("> \t").strip()
+        if line and not _FORWARD_LINE.match(line):
+            lines.append(line)
+    text = " ".join(" ".join(lines).lower().split())
+    if len(text) < MIN_CONTENT_CHARS:
+        return ""
+    subject = " ".join(_SUBJECT_PREFIX.sub("", subject).lower().split())
+    return hashlib.sha256(f"{subject}|{text}".encode()).hexdigest()[:24]
+
+
 class IntakeRunner:
     def __init__(self, container: Container) -> None:
         loaded = container.loaded
@@ -67,6 +101,7 @@ class IntakeRunner:
                              self.features.on("dry_run"))
         self.service = IntakeService(loaded, self.tickets, self.state, self.clock, self.writes)
         self.threads = Records(self.state, "email-threads")
+        self.contents = Records(self.state, "email-contents")
         self.service_accounts = {a.service_account for a in loaded.agents.values()}
         self.known_repos = sorted({r for a in loaded.agents.values() for r in a.repos})
 
@@ -125,11 +160,11 @@ class IntakeRunner:
 
     def handle_email(self, mailbox, msg: MailMessage) -> IntakeResult | None:
         cfg = self.cfg.intake.email
-        seen = self.state.get("intake-email-messages", msg.message_id)
-        if seen:
+        mid = message_key(msg.message_id) or msg.message_id
+        if self.state.get("intake-email-messages", mid):
             self._ignore(msg, "duplicate delivery")
             return None
-        self.state.put("intake-email-messages", msg.message_id, "1")
+        self.state.put("intake-email-messages", mid, "1")
         reason = self.auto_generated(msg)
         if reason:
             self._ignore(msg, reason)
@@ -142,13 +177,21 @@ class IntakeRunner:
         if existing:
             return self.thread_reply(msg, existing["ticket"])
         thread = mailbox.get_thread(msg.thread_id)
+        content = content_key(msg.subject, msg.body)
+        earlier = self.earlier_request(content)
+        if earlier:
+            return self.duplicate_request(mailbox, thread.messages, msg, earlier)
         draft = self.draft(thread.messages, msg)
         sender = _addr(msg.sender)
+        user = self.tickets.find_user_by_email(sender)
+        description = draft["description"]
+        if user is None:
+            description += f"\n\n{sender} has no account in the ticket system, so the factory is the reporter."
         event = IntakeEvent(
             source="email", event_id=msg.thread_id, project=cfg.default_project,
-            summary=draft["summary"][:250], description=draft["description"],
+            summary=draft["summary"][:250], description=description,
             issue_type=cfg.default_issue_type or "Task", repo=draft["repo"], location="",
-            components=tuple(draft["components"]), reporter=cfg.user_map.get(sender, sender),
+            components=tuple(draft["components"]), reporter=user.id if user else "",
             trusted=self.trusted(msg), auto_label=cfg.auto_label,
             fields={"acceptance_criteria": "\n".join(f"- {c}" for c in draft["acceptance_criteria"]),
                     "verify_steps": draft["verify_steps"]},
@@ -157,7 +200,33 @@ class IntakeRunner:
         if not result.ticket_key:
             return result
         self.threads.put(msg.thread_id, {"ticket": result.ticket_key})
+        if content:
+            self.contents.put(content, {"ticket": result.ticket_key, "at": self.clock.now().isoformat()})
         self.reply(mailbox, thread.messages, msg, result)
+        return result
+
+    def earlier_request(self, content: str) -> str:
+        """The ticket an identical request created within the dedupe window."""
+        if not content:
+            return ""
+        seen = self.contents.get(content)
+        if not seen:
+            return ""
+        window = timedelta(days=self.cfg.intake.dedupe_window_days)
+        if self.clock.now() - datetime.fromisoformat(seen["at"]) >= window:
+            self.contents.delete(content)
+            return ""
+        return seen["ticket"]
+
+    def duplicate_request(self, mailbox, messages, msg: MailMessage, ticket_key: str) -> IntakeResult:
+        self.metrics.incr("email_duplicates", reason="same request")
+        self.threads.put(msg.thread_id, {"ticket": ticket_key})
+        self.writes.comment(ticket_key, "finished", Note(
+            "Related report", "unchanged",
+            done=f"The same request arrived again by email from {_addr(msg.sender)}; no duplicate was created."),
+            f"intake:email:{msg.thread_id}")
+        result = IntakeResult(ticket_key, False, duplicate_of=ticket_key)
+        self.reply(mailbox, messages, msg, result)
         return result
 
     def thread_reply(self, msg: MailMessage, ticket_key: str) -> None:

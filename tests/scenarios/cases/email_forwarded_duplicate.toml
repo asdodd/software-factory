@@ -1,0 +1,24 @@
+name = "the same request sent again in a new thread, or forwarded by someone else, goes to the first ticket"
+include = ["_common.toml", "_email.toml"]
+
+[[steps]]
+email = { from = "alice@sim.invalid", subject = "Need multiply in calc", body = "Please add a multiply function to the calc module.", thread = "t-1", message_id = "<First@sim.invalid>" }
+[[steps]]
+# The same message reaching the mailbox again, with the Message-ID written differently.
+email = { from = "alice@sim.invalid", subject = "Need multiply in calc", body = "Please add a multiply function to the calc module.", thread = "t-1", message_id = "first@SIM.invalid" }
+[[steps]]
+# Forwarded by bob in a new thread: prefixes, quote markers, and forward headers differ.
+email = { from = "bob@sim.invalid", subject = "Fwd: RE: Need multiply in calc", body = "---------- Forwarded message ---------\nFrom: alice@sim.invalid\nSubject: Need multiply in calc\n\n> Please add a multiply function\n> to the calc module.\n", thread = "t-2", message_id = "<fwd@sim.invalid>" }
+[[steps]]
+intake_poll = true
+
+[expect]
+ticket_count = 1
+metrics = { email_duplicates = 1 }
+[[expect.tickets]]
+key = "SIM-1"
+reporter = "alice"
+comments_contain = ["The same request arrived again by email from bob@sim.invalid; no duplicate was created."]
+[expect.email]
+replies = 2
+reply_contains = ["Created SIM-1", "This matches an existing ticket, SIM-1"]

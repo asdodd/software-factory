@@ -33,14 +33,16 @@ This list is generated from the validator.
 - `collaboration.factory_identity`: the account the factory posts as. Its comments are never read as replies.
 
 **Jira workflow mapping** (the factory's logical state on the left, your Jira's name on the right)
-- `workflow.statuses.ready`, `in_progress`, `spec_review`, `in_review`, `needs_info`, `blocked`, `failed`, `done`. Also `stalled`, which is optional and defaults to unset.
+- `workflow.statuses.ready` (for example `Open`) and `workflow.statuses.in_progress` (for example `In Progress`). Humans own every other status change (for example to `In Review` and `Complete`). The factory claims from `ready` and only ever moves a ticket to `in_progress`, when implementation starts. Every other state is a label.
 - `workflow.fields.lease_owner`, `lease_expires`, `repo`, `acceptance_criteria`, `verify_steps`, `sponsor_team`, `source_ref`, `fingerprint`: the `customfield_NNNNN` ids. Lease, source_ref and fingerprint can be hidden text fields.
 - `workflow.link_types.relates`, `blocks`, `duplicates`: your issue link type names
 - `workflow.ticket_url_template`, for example `https://jira.internal/browse/{key}`
 - Optional: `workflow.transitions.<state>` where the target status alone is ambiguous, and `workflow.priority_order`
 
 **Labels**
-- `labels.ready`, `labels.failed`, `labels.needs_info`. Optional: `stalled`, `spec_approved`. Each agent may override these in `config/agents/<name>.toml`.
+- Defaults are in `config/base.toml`. Change any of them per profile or per agent (`[overrides.labels]`).
+- `ready` (a human applies it), `claimed` (the lock, `ai-claimed-{agent}`), `needs_info` (bounced or waiting on answers), `spec_review` and `spec_approved`, `in_review`, `blocked`, `failed`, `stalled`. Any value may contain `{agent}`.
+- A ticket with any state label is not claimed as new work. To retry, a human removes the label, and sets the status back to `ready` if the agent had moved it to `in_progress`.
 
 **Models** (any provider name under `models.providers`; use a different one for review)
 - `models.stages.triage.model`, `spec`, `implement`, `review`, `respond`, `intake`, `grading`, `improve`. Only the stages whose features are on are validated.
@@ -50,10 +52,11 @@ This list is generated from the validator.
 - **`[collaboration.allowed_commenters]`:** these ship empty, so the agents ignore every reply until you add users, groups or roles.
 - **`[notifications]`:** who is mentioned for spec review, MR ready, failed and blocked tickets. Set `plugins.notifier.settings.mention_format` (Jira Server/Data Center uses `[~{user}]`).
 - **`config/agents/*.toml`:** real filters, repos, service accounts and teams. The shipped agents are examples with `SIM` project values.
-- **`[intake.email]`** (if used): `address`, `allowlisted_senders`, `user_map`, and `require_authenticated_sender = true` if your mail server adds `Authentication-Results`. Then set `plugins.mailbox.settings` `imap_host`, `smtp_host` and `processed_folder`.
+- **`[intake.email]`** (if used): `address` and `allowlisted_senders`. The `From:` header is trusted. The reporter is the Jira user found by the sender's address, so the service account needs permission to browse users. Then set `plugins.mailbox.settings` `imap_host`, `smtp_host` and `processed_folder`.
 - **`[intake.gitlab]`:** `allowed_authors`, and `plugins.git_host.settings.watched_projects`.
 - **`[feedback.self_improvement].repo`:** the factory repo's GitLab path, if self-improvement is on.
 - **`[git.host_credentials]` and `git.url_rewrites`:** for submodules on other hosts.
+- **`[repos."group/name"]`** (optional, in the factory's config, never in the target repo): `standards`, the `commands` the factory re-runs as gates (setup, lint, test, verify), `evidence`, `protected_paths`, `coverage_report`, `mutation`. With no entry, the agent runs the repo's own tooling and the repo's CI judges the merge request.
 - **`[limits]`, `[gates]` and polling intervals:** tune after the first week of metrics (`factory metrics`).
 
 ## 4. Infrastructure checklist

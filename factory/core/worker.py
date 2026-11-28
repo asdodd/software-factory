@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -25,7 +24,6 @@ from pathlib import Path
 
 from factory import agent_kit
 from factory.config.schema import RepoRules
-from factory.config.validate import ConfigError, build
 from factory.core import architecture, gates, instructions, quality, readiness, workspace
 from factory.core.budget import BudgetedModels
 from factory.core.claim import Claimer
@@ -156,8 +154,9 @@ class Worker:
         self.dry_run = self.features.on("dry_run")
         self.writes = Writes(self.tickets, self.git, self.state, self.clock, container.redactor, self.cfg,
                              agent_name, self.dry_run)
+        other_locks = {loaded.agent_configs[n].labels.claimed: n for n in loaded.agents if n != agent_name}
         self.claimer = Claimer(self.tickets, self.writes, self.clock, self.agent, self.cfg, self.worker_id,
-                               self.metrics, self.dry_run)
+                               self.metrics, self.dry_run, other_locks)
         self.paused = Records(self.state, f"paused:{agent_name}")
         self.paused_index = Index(self.state, "paused-index", agent_name)
         self.mrs = Records(self.state, f"mr:{agent_name}")
@@ -282,12 +281,12 @@ class _Run:
         self.w.writes.mr_reply(repo, f.mr_id, f.thread_id, body, f"{f.comment_id}:{suffix}")
 
     def fail(self, summary: str) -> RunReport:
-        labels = self.cfg.labels
-        self.w.writes.transition(self.key, LogicalStatus.FAILED)
-        self.labels(add=[labels.failed], remove=[labels.ready])
+        failed = self.cfg.labels.failed
+        self.labels(add=[failed])
         self.release()
         self.say("failed", Note("Failed", "failed", done=summary,
-                                next="A human should review the ticket and the trace before retrying."))
+                                next="A human should review the ticket and the trace. To retry, remove the "
+                                     f"{failed} label (and set the status back if it is in progress)."))
         self.w.notify(NotificationKind.TICKET_FAILED, self.ticket, f"{self.key} failed: {summary[:200]}")
         return RunReport(self.key, Outcome.FAILED, summary, self.run_id)
 
@@ -296,16 +295,16 @@ class _Run:
         if self.fix is not None:
             self.reply(f"I could not make this change: {detail}", "blocked")
             return Stop(Outcome.FIX_FAILED, detail)
-        self.w.writes.transition(self.key, LogicalStatus.BLOCKED)
+        self.labels(add=[self.cfg.labels.blocked])
         self.release()
-        self.say("blocked", Note("Blocked", "blocked", done=detail, next="Needs a human decision."))
+        self.say("blocked", Note("Blocked", "blocked", done=detail,
+                                 next=f"Needs a human decision. Remove the {self.cfg.labels.blocked} label to retry."))
         self.w.notify(NotificationKind.TICKET_BLOCKED, self.ticket, f"{self.key} is blocked", detail)
         return Stop(Outcome.BLOCKED, detail)
 
     def stalled(self, why: str) -> Stop:
         labels = self.cfg.labels
         self.labels(add=[labels.stalled], remove=[labels.needs_info])
-        self.w.writes.transition(self.key, LogicalStatus.STALLED)
         self.release()
         self.say("stalled", Note("Stalled", "stalled", done=why, next="A human should pick this up or clarify the ticket."))
         return Stop(Outcome.STALLED, why)
@@ -320,8 +319,6 @@ class _Run:
         rounds = self.rounds + 1
         if rounds > jc.max_question_rounds:
             raise self.stalled(f"Still unclear after {jc.max_question_rounds} rounds of questions: {why}")
-        if jc.needs_info_action == "status":
-            self.w.writes.transition(self.key, LogicalStatus.NEEDS_INFO)
         self.labels(add=[self.cfg.labels.needs_info])
         if jc.lease_while_paused == "release":
             self.release()
@@ -354,6 +351,8 @@ class _Run:
             self.check_ready(None)
         withheld, attach_dir = self.attachments()
         spec = ""
+        if self.mode == "resume":
+            self.labels(remove=[self.cfg.labels.spec_review])
         if self.mode in ("resume", "answer"):
             spec = self.w.state.get("spec", self.key) or ""
         elif features.on("triage"):
@@ -363,6 +362,7 @@ class _Run:
             self.check_ready(self.rules)
         if not features.on("implement"):
             raise Stop(Outcome.BLOCKED, "implement is disabled")
+        self.start_progress()
         self.say("implementation_started", Note(
             "Implementing", "in progress",
             done=f"Harness {self.cfg.models.stages.implement.harness}, model "
@@ -391,16 +391,21 @@ class _Run:
         r = self.repos[0]
         return self.publish_fix(r.found, r.stats, summary, r.copy)
 
+    def start_progress(self) -> None:
+        """The one status change the factory makes; humans own the rest."""
+        if self.ticket.status != self.w.writes.native_status(LogicalStatus.IN_PROGRESS):
+            self.w.writes.transition(self.key, LogicalStatus.IN_PROGRESS)
+
     def check_ready(self, rules: RepoRules | None) -> None:
-        result = readiness.evaluate(self.ticket, self.cfg.limits, self.w.agent.repos, rules)
+        has_ci = bool(self.repos) and workspace.has_ci(self.repos[0].clone_root)
+        result = readiness.evaluate(self.ticket, self.cfg.limits, self.w.agent.repos, rules, has_ci)
         if result.ready:
             return
-        labels = self.cfg.labels
-        self.labels(add=[labels.needs_info], remove=[labels.ready])
-        self.w.writes.transition(self.key, LogicalStatus.NEEDS_INFO)
+        needs_info = self.cfg.labels.needs_info
+        self.labels(add=[needs_info])
         self.release()
         self.say("bounced", Note("Not ready", "returned to requester", done="The readiness check failed.",
-                                 next="Fix the items below, then re-apply the ready label.",
+                                 next=f"Fix the items below, then remove the {needs_info} label.",
                                  questions=result.failures))
         raise Stop(Outcome.BOUNCED, "; ".join(result.failures))
 
@@ -429,7 +434,7 @@ class _Run:
                               self.ticket_text())
         self.rec.stage_done("spec")
         self.w.state.put("spec", self.key, spec)
-        self.w.writes.transition(self.key, LogicalStatus.SPEC_REVIEW)
+        self.labels(add=[self.cfg.labels.spec_review])
         self.release()
         self.say("spec_posted", Note("Spec ready for review", "spec review", done=spec,
                                      next=f"Apply the {self.cfg.labels.spec_approved} label to approve."))
@@ -461,7 +466,7 @@ class _Run:
                 raise self.blocked(f"A submodule{where} could not be checked out: {exc.path}.", [exc.path]) from None
             except NotFound:
                 return self.fail_stop(f"Repo {repo_path} could not be cloned.")
-            rules = self.load_rules(clone_root)
+            rules = self.cfg.repos.get(repo_path, RepoRules())
             failed = [s for s in checkout.submodules if not s.ok]
             if failed:
                 self.rec.event("submodules_skipped", {"repo": repo_path, "paths": [s.path for s in failed]},
@@ -475,15 +480,6 @@ class _Run:
     def fail_stop(self, summary: str) -> Stop:
         report = self.fail(summary)
         raise Stop(report.outcome, report.detail)
-
-    def load_rules(self, clone_root: Path) -> RepoRules:
-        path = ".factory/rules.toml"
-        if not (clone_root / path).is_file():
-            return RepoRules()
-        try:
-            return build(RepoRules, tomllib.loads((clone_root / path).read_text()))
-        except (tomllib.TOMLDecodeError, ConfigError) as exc:
-            return self.fail_stop(f"The repo rules file {path} is invalid: {exc}")
 
     def standards(self) -> list[tuple[str, str]]:
         """(name, text) of each repo's standards files, for the reviewer."""
@@ -662,6 +658,12 @@ class _Run:
                 report.failures.append(f"{phase} failed: {' '.join(argv)} (exit {res.exit_code})")
             return res.exit_code == 0
 
+        if not (commands.setup or commands.lint or commands.test or commands.verify):
+            # Nothing configured for this repo in the factory: the agent ran the
+            # repo's own tooling, and the repo's CI judges the merge request.
+            report.flags.append("lint and tests: run by the agent with the repo's own tooling; the repo's CI "
+                                "checks the merge request (no factory commands for this repo)")
+            return report
         for phase, argvs in (("setup", commands.setup), ("lint", commands.lint), ("test", commands.test)):
             for argv in argvs:
                 if not run(phase, argv):
@@ -703,8 +705,7 @@ class _Run:
                         report.failures.append(f"{line} is below {g.min_changed_line_coverage:.0%}")
                     else:
                         report.flags.append(line)
-        else:
-            report.flags.append("coverage on changed lines not measured (no coverage_report in the repo rules)")
+
         m = rules.mutation
         if m.command and report.passed:
             if not run("mutation", m.command):
@@ -721,8 +722,6 @@ class _Run:
                                        " (tests may be tautological)")
             else:
                 report.flags.append(f"mutation score {score:.0%} over {mutants} mutant(s)")
-        elif not m.command:
-            report.flags.append("mutation score not measured (no mutation command in the repo rules)")
         self.quality_flags += report.flags
         return report
 
@@ -808,7 +807,7 @@ class _Run:
                 if compare:
                     links["Compare" + suffix] = compare
         outcome = Outcome.MR_OPENED if self.cfg.output.mode == "merge_request" else Outcome.BRANCH_PUSHED
-        self.w.writes.transition(self.key, LogicalStatus.IN_REVIEW)
+        self.labels(add=[self.cfg.labels.in_review])
         self.release()
         done = "\n\n".join(descriptions.values()) if self.cfg.output.mode == "branch_only" else summary
         self.say("finished", Note("Ready for human review", "in review", done=done, links=links,

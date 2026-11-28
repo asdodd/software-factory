@@ -44,7 +44,9 @@ class PluginsConfig:
 class WorkflowConfig:
     """Jira status and workflow mapping.
 
-    statuses: logical status (factory.ports.types.LogicalStatus value) -> native status name.
+    statuses: logical status -> native status name. Only "ready" (claimed from)
+      and "in_progress" (the one status the factory sets) are used; any other
+      status change is a human's.
     transitions: optional native transition name per logical status, for workflows
       where the target status alone is ambiguous.
     fields: logical field name -> native custom field id.
@@ -63,11 +65,34 @@ class WorkflowConfig:
 
 @dataclass(frozen=True)
 class LabelsConfig:
+    """Every factory state lives in a label: agents never change a ticket's
+    status except to move it to in_progress. Any value may contain {agent},
+    replaced by the agent's name, so each agent can get its own labels.
+
+    ready: a human applies it; the agent's filter selects on it.
+    claimed: the lock. Added at claim, removed at release. It must contain
+      {agent}, so two agents that claim the same ticket at once can see each
+      other and one backs off.
+    needs_info: the ticket bounced (not ready) or the agent asked questions.
+    spec_review: a spec is posted and waits for spec_approved (a human adds it).
+    in_review: the merge request or branch is ready for a human.
+    blocked, failed, stalled: the agent stopped; a human decides what next.
+    A ticket carrying any state label is not claimed as new work."""
+
     ready: str = ""
-    failed: str = ""
+    claimed: str = "ai-claimed-{agent}"
     needs_info: str = ""
-    stalled: str = ""
+    spec_review: str = ""
     spec_approved: str = ""
+    in_review: str = ""
+    blocked: str = ""
+    failed: str = ""
+    stalled: str = ""
+
+    def state_labels(self) -> list[str]:
+        """Labels that keep a ticket out of the ready queue."""
+        return [x for x in (self.needs_info, self.spec_review, self.in_review, self.blocked, self.failed,
+                            self.stalled) if x]
 
 
 @dataclass(frozen=True)
@@ -106,7 +131,6 @@ class JiraCommentsConfig:
     stall_timeout_hours: int = 72
     max_question_rounds: int = 3
     comment_rate_limit_per_hour: int = 20
-    needs_info_action: Literal["label", "status"] = "label"
     lease_while_paused: Literal["hold", "release"] = "release"
 
 
@@ -231,17 +255,21 @@ class TraceStoreConfig:
 @dataclass(frozen=True)
 class EmailIntakeConfig:
     """address: the bot's own address. Mail is read only when the bot is in To or Cc.
-    allowlisted_senders may use shell-style wildcards (*@team.example).
-    user_map maps a sender address to a ticket-system user id; unmapped senders
-    become the reporter by address. Senders matching ignore_senders, auto-generated
-    mail, and the bot's own mail are never answered (loop protection)."""
+    allowlisted_senders may use shell-style wildcards (*@team.example). The
+    From: header is trusted unless require_authenticated_sender is on.
+    The reporter is the ticket-system user found by the sender's address; a
+    sender with no user is named in the description instead.
+    Duplicates: the same message (by Message-ID), the same thread, and the same
+    request sent again or forwarded (same normalized subject and body within
+    dedupe_window_days) all go to the first ticket. Senders matching
+    ignore_senders, auto-generated mail, and the bot's own mail are never
+    answered (loop protection)."""
 
     address: str = ""
     allow_updates: bool = False
     auto_label: bool = False
     allowlisted_senders: list[str] = field(default_factory=list)
     require_authenticated_sender: bool = False
-    user_map: dict[str, str] = field(default_factory=dict)
     ignore_senders: list[str] = field(default_factory=lambda: [
         "mailer-daemon@*", "postmaster@*", "noreply@*", "no-reply@*", "donotreply@*"])
     max_reply_recipients: int = 10
@@ -420,6 +448,46 @@ class GatesConfig:
 
 
 @dataclass(frozen=True)
+class RepoCommands:
+    """Each entry is one argv list. Language-agnostic: the repo says how it is
+    linted, tested, and verified; the factory only runs the commands."""
+
+    setup: list[list[str]] = field(default_factory=list)
+    lint: list[list[str]] = field(default_factory=list)
+    test: list[list[str]] = field(default_factory=list)
+    verify: list[list[str]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class MutationRules:
+    """command produces report; format stryker (mutation-testing-report-schema) or
+    score ({"score": 0.0-1.0}). Empty command means mutation is not measured."""
+
+    command: list[str] = field(default_factory=list)
+    report: str = ""
+    format: Literal["stryker", "score"] = "stryker"
+
+
+@dataclass(frozen=True)
+class RepoRules:
+    """Optional per-repo settings, kept in the factory's config under
+    [repos."group/name"], never in the target repo. Everything is optional:
+    with no entry, the agent finds and runs the repo's own lint, tests,
+    coverage, and mutation tooling (its CI file, scripts, AGENTS.md and skills),
+    the factory applies only its mechanical diff gates, and the repo's own CI
+    judges the merge request. Commands listed here are re-run by the factory
+    as gates. Settings may add rules, never relax global ones."""
+
+    standards: list[str] = field(default_factory=list)
+    commands: RepoCommands = field(default_factory=RepoCommands)
+    evidence: list[str] = field(default_factory=list)
+    protected_paths: list[str] = field(default_factory=list)
+    command_timeout_seconds: int = 900
+    coverage_report: str = ""
+    mutation: MutationRules = field(default_factory=MutationRules)
+
+
+@dataclass(frozen=True)
 class GlobalRulesConfig:
     """The pinned global factory repo: stages, checklist, PR templates, base skills."""
 
@@ -448,6 +516,7 @@ class FactoryConfig:
     gates: GatesConfig = field(default_factory=GatesConfig)
     notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
+    repos: dict[str, RepoRules] = field(default_factory=dict)
     features: dict[str, bool] = field(default_factory=dict)
 
 
@@ -497,38 +566,3 @@ class AgentConfig:
     filter: FilterConfig = field(default_factory=FilterConfig)
     claim: ClaimConfig = field(default_factory=ClaimConfig)
     overrides: AgentOverrides = field(default_factory=AgentOverrides)
-
-
-@dataclass(frozen=True)
-class RepoCommands:
-    """Each entry is one argv list. Language-agnostic: the repo says how it is
-    linted, tested, and verified; the factory only runs the commands."""
-
-    setup: list[list[str]] = field(default_factory=list)
-    lint: list[list[str]] = field(default_factory=list)
-    test: list[list[str]] = field(default_factory=list)
-    verify: list[list[str]] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class MutationRules:
-    """command produces report; format stryker (mutation-testing-report-schema) or
-    score ({"score": 0.0-1.0}). Empty command means mutation is not measured."""
-
-    command: list[str] = field(default_factory=list)
-    report: str = ""
-    format: Literal["stryker", "score"] = "stryker"
-
-
-@dataclass(frozen=True)
-class RepoRules:
-    """Per-repo layer, read from `.factory/rules.toml` in the repo. It may add
-    rules, never relax global ones."""
-
-    standards: list[str] = field(default_factory=list)
-    commands: RepoCommands = field(default_factory=RepoCommands)
-    evidence: list[str] = field(default_factory=list)
-    protected_paths: list[str] = field(default_factory=list)
-    command_timeout_seconds: int = 900
-    coverage_report: str = ""
-    mutation: MutationRules = field(default_factory=MutationRules)

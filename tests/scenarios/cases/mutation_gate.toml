@@ -3,16 +3,9 @@ include = ["_ticket.toml", "_good_change.toml"]
 
 [[repos]]
 path = "web/portal"
+rules = { commands = { test = [["python3", "-c", "print('tests pass')"]] }, mutation = { command = ["python3", "-c", "import json; json.dump({'files': {'src/calc.py': {'mutants': [{'status': 'Survived'}, {'status': 'Survived'}, {'status': 'Killed'}]}}}, open('mutation.json', 'w'))"], report = "mutation.json", format = "stryker" } }
 [repos.files]
 "src/calc.py" = "def add(a, b):\n    return a + b\n"
-".factory/rules.toml" = """
-[commands]
-test = [["python3", "-c", "print('tests pass')"]]
-[mutation]
-command = ["python3", "-c", "import json; json.dump({'files': {'src/calc.py': {'mutants': [{'status': 'Survived'}, {'status': 'Survived'}, {'status': 'Killed'}]}}}, open('mutation.json', 'w'))"]
-report = "mutation.json"
-format = "stryker"
-"""
 
 [[model]]
 stage = "triage"

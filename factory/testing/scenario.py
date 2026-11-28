@@ -110,9 +110,13 @@ def run(data: dict, root: Path, workdir: Path, scenario_dir: Path) -> ScenarioRe
     overrides = Overrides(tuple(ov.get("set", ())), tuple(ov.get("enable", ())), tuple(ov.get("disable", ())),
                           bool(ov.get("dry_run", False)), ov.get("output_mode"))
     env = {str(k): str(v) for k, v in data.get("env", {}).items()}
+    settings = dict(data.get("settings", {}))
+    repo_rules = {repo["path"]: repo["rules"] for repo in data.get("repos", []) if "rules" in repo}
+    if repo_rules:  # a fixture repo's factory-side settings: [repos."path"] in config
+        settings["repos"] = {**repo_rules, **settings.get("repos", {})}
     try:
         loaded = load(root, data.get("profile", "sim"), env, overrides,
-                      [Layer("scenario", data.get("settings", {}))], agents_dir)
+                      [Layer("scenario", settings)], agents_dir)
     except ConfigError as exc:
         wanted = expect.get("startup_error")
         if not wanted:
@@ -362,6 +366,9 @@ def check(result: ScenarioResult, expect: dict, c: Container, workers: dict[str,
     for text in g.get("mr_description_contains", []):
         if not any(text in d for d in git.mr_descriptions.values()):
             fail(f"no MR description contains {text!r}")
+    for text in g.get("mr_description_exclude", []):
+        if any(text in d for d in git.mr_descriptions.values()):
+            fail(f"an MR description contains forbidden text {text!r}")
     for bf in g.get("branch_files", []):
         files = git.branch_files(bf["path"], bf["branch"])
         for name, needle in bf.get("contains", {}).items():

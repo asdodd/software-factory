@@ -34,8 +34,12 @@ Hook = Callable[["FakeTicketSystem", str, TicketKey], None]
 class FakeTicketSystem:
     NATIVE_ADAPTER = "fake"
 
-    def __init__(self, clock, identity: str = "svc-factory", workflow: Mapping[str, Iterable[str]] | None = None) -> None:
+    def __init__(self, clock, identity: str = "svc-factory", workflow: Mapping[str, Iterable[str]] | None = None,
+                 initial_status: str = "Open", users: Mapping[str, str] | None = None) -> None:
         self._clock = clock
+        self.users = {k.lower(): v for k, v in (users or {}).items()}  # email -> user id
+        self.user_lookups = 0
+        self.initial_status = initial_status
         self.identity = Principal(identity, identity, PrincipalKind.SERVICE)
         self.workflow = {k: set(v) for k, v in (workflow or {}).items()}
         self.tickets: dict[TicketKey, Ticket] = {}
@@ -53,7 +57,8 @@ class FakeTicketSystem:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, object], ctx: AdapterContext) -> FakeTicketSystem:
-        ts = cls(ctx.clock, str(settings.get("identity", "svc-factory")), settings.get("workflow"))
+        ts = cls(ctx.clock, str(settings.get("identity", "svc-factory")), settings.get("workflow"),
+                 str(settings.get("initial_status", "Open")), settings.get("users"))
         fixtures = settings.get("fixtures")
         if fixtures and (ctx.base_dir / str(fixtures)).exists():
             with (ctx.base_dir / str(fixtures)).open("rb") as fh:
@@ -78,6 +83,14 @@ class FakeTicketSystem:
         self.tickets[key] = ticket
         self._counters[ticket.project] = max(self._counters[ticket.project], _num(key))
         return ticket
+
+    def add_user(self, email: str, user_id: str) -> None:
+        self.users[email.lower()] = user_id
+
+    def find_user_by_email(self, email: str) -> Principal | None:
+        self.user_lookups += 1
+        user = self.users.get(email.lower())
+        return Principal(user, user, PrincipalKind.USER) if user else None
 
     def add_human_comment(self, key: TicketKey, author: str, body: str, groups: Iterable[str] = (),
                           kind: PrincipalKind = PrincipalKind.USER) -> Comment:
@@ -164,7 +177,8 @@ class FakeTicketSystem:
         self._counters[draft.project] += 1
         key = f"{draft.project}-{self._counters[draft.project]}"
         now = self._clock.now()
-        ticket = Ticket(key, draft.project, draft.summary, draft.description, "Open", draft.issue_type, "Medium",
+        ticket = Ticket(key, draft.project, draft.summary, draft.description, self.initial_status, draft.issue_type,
+                        "Medium",
                         frozenset(draft.labels), frozenset(draft.components), draft.reporter, None, now, now,
                         dict(draft.fields))
         self.tickets[key] = ticket

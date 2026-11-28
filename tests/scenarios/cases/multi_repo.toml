@@ -3,10 +3,10 @@ include = ["_common.toml"]
 
 [[repos]]
 path = "web/design-system"
+rules = { commands = { test = [["python3", "-m", "unittest", "discover", "-s", "tests"]] } }
 [repos.files]
 "tokens.py" = "PRIMARY = '#000'\n"
 "tests/test_tokens.py" = "import sys, unittest\nsys.path.insert(0, '.')\nimport tokens\n\nclass T(unittest.TestCase):\n    def test_primary(self):\n        self.assertTrue(tokens.PRIMARY)\n"
-".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-m\", \"unittest\", \"discover\", \"-s\", \"tests\"]]\n"
 
 [[tickets]]
 key = "SIM-1"
@@ -39,7 +39,8 @@ instructions_contain = ["This ticket spans several repos", "web/portal: ./portal
                         "Repo commands: web/design-system (run in ./design-system/)"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "In Review"
+status = "In Progress"
+labels_include = ["ai-in-review"]
 comments_contain = ["Merge request (web/portal)", "Merge request (web/design-system)"]
 [expect.git]
 mrs = 2

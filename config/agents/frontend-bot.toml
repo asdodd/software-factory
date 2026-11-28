@@ -6,7 +6,6 @@ repos = ["web/portal", "web/design-system"]
 
 [filter]
 labels_any = ["ai-ready-frontend"]
-labels_none = ["ai-failed", "ai-needs-info"]
 projects = ["SIM"]
 components = ["ui", "portal"]
 issue_types = ["Task", "Bug"]

@@ -1,5 +1,5 @@
 """Hard PR criteria as mechanical checks. Nuance becomes a rule or it does not
-gate. Thresholds come from config; repo rules may only add protected paths."""
+gate. Thresholds come from config; per-repo settings may only add protected paths."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from factory.config.schema import FactoryConfig, RepoRules
 from factory.core.workspace import Change, LineStats
 from factory.ports.types import Ticket
 
-ALWAYS_PROTECTED = (".factory/**", ".git/**", ".gitmodules")
+ALWAYS_PROTECTED = (".git/**", ".gitmodules")
 COMMENT_PREFIXES = ("#", "//", "/*", "*", "--", ";", "<!--", '"""', "'''")
 MR_SECTIONS = ("What changed", "Why", "Blast radius", "How verified", "Architecture diff")
 

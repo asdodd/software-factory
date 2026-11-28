@@ -13,10 +13,10 @@ submodules = { "deep" = "../deep.git" }
 
 [[repos]]
 path = "web/app"
+rules = { commands = { test = [["python3", "-c", "print('ok')"]] } }
 submodules = { "vendor/core" = "../../libs/core.git" }
 [repos.files]
 "src/app.py" = "from vendor.core import core\n"
-".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
 
 [[commits]]
 path = "libs/core"

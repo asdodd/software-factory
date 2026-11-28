@@ -3,15 +3,10 @@ include = ["_ticket.toml", "_good_change.toml"]
 
 [[repos]]
 path = "web/portal"
+rules = { coverage_report = "lcov.info", protected_paths = ["tools/**"], commands = { test = [["python3", "tools/write_lcov.py"]] } }
 [repos.files]
 "src/calc.py" = "def add(a, b):\n    return a + b\n"
 "tools/write_lcov.py" = "lines = ['SF:src/calc.py', 'DA:1,1', 'DA:2,1', 'DA:5,0', 'DA:6,0', 'end_of_record']\nopen('lcov.info', 'w').write(chr(10).join(lines) + chr(10))\n"
-".factory/rules.toml" = """
-coverage_report = "lcov.info"
-protected_paths = ["tools/**"]
-[commands]
-test = [["python3", "tools/write_lcov.py"]]
-"""
 
 [[model]]
 stage = "triage"

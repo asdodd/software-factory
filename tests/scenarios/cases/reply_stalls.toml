@@ -10,9 +10,9 @@ run = "frontend-bot"
 outcomes = ["needs_info", "stalled"]
 [[expect.tickets]]
 key = "SIM-1"
-status = "Open"
+status = "In Progress"
 paused = false
-labels_include = ["ai-stalled"]
+labels_include = ["ai-stalled", "ai-stalled"]
 labels_exclude = ["ai-needs-info"]
 lease_released = true
 comments_contain = ["Stalled", "No answer within 72 hours."]

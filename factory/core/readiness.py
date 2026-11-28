@@ -57,9 +57,10 @@ def acceptance_items(ticket: Ticket) -> list[str]:
 
 
 def evaluate(ticket: Ticket, limits: LimitsConfig, repo_scope: list[str] | None = None,
-             rules: RepoRules | None = None) -> Readiness:
-    """rules=None means the repo has not been read yet; a verify check that
-    could be satisfied by the repo rules then passes provisionally."""
+             rules: RepoRules | None = None, has_ci: bool = False) -> Readiness:
+    """rules=None means the repo has not been cloned yet, so the verify check
+    passes provisionally. After the clone, verification is known from the
+    ticket's verify steps, factory commands for the repo, or the repo's own CI."""
     failures = []
     for _id, rule, message in checklist():
         if rule == "repo_identified":
@@ -73,7 +74,7 @@ def evaluate(ticket: Ticket, limits: LimitsConfig, repo_scope: list[str] | None 
             if not acceptance_items(ticket):
                 failures.append(message)
         elif rule == "verification_known":
-            if not text_field(ticket, "verify_steps") and rules is not None and not (
+            if not text_field(ticket, "verify_steps") and rules is not None and not has_ci and not (
                 rules.commands.verify or rules.commands.test
             ):
                 failures.append(message)

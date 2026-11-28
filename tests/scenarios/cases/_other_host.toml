@@ -14,10 +14,10 @@ path = "other/shared"
 
 [[repos]]
 path = "web/app"
+rules = { commands = { test = [["python3", "-c", "print('ok')"]] } }
 submodules = { "vendor/shared" = "https://other-host.example/shared.git" }
 [repos.files]
 "src/app.py" = "print('app')\n"
-".factory/rules.toml" = "[commands]\ntest = [[\"python3\", \"-c\", \"print('ok')\"]]\n"
 
 [[tickets]]
 key = "SIM-1"
